@@ -2,15 +2,14 @@
 
 A desktop application for creating and publishing announcements to Canvas LMS with file attachment support.
 
-## Features
+## Platform Support
 
-- 🎯 **Course Selection**: Choose from your Canvas courses with an intuitive interface
-- 📝 **Rich Text Editor**: Create announcements with TinyMCE's powerful editor
-- 📎 **File Attachments**: Upload and attach files directly to announcements
-- ⏰ **Scheduling**: Schedule announcements for future publication
-- ⚠️ **Smart Warnings**: Alerts when mentioning attachments without uploading files
-- 📋 **Assignment Integration**: Automatically includes upcoming assignments
+Can Announce may run on multiple operating systems:
+- **macOS** (Primary development platform)
+- **Windows** (With Windows-specific installation script)
+- **Ubuntu/Linux** (Tested via CI/CD)
 
+Non-Mac platforms are not all at effectively tested either for installation or operation. But should work in theory.
 ## Requirements
 
 - Python 3.7+
@@ -20,7 +19,7 @@ A desktop application for creating and publishing announcements to Canvas LMS wi
 
 ## Installation
 
-### Quick Install (Recommended)
+### macOS (Recommended)
 ```bash
 git clone https://github.com/yourusername/canannounce.git
 cd canannounce
@@ -28,10 +27,29 @@ chmod +x install_dependencies.sh
 ./install_dependencies.sh
 ```
 
-### Manual Installation
+### Windows
+```cmd
+git clone https://github.com/yourusername/canannounce.git
+cd canannounce
+install_dependencies.bat
+```
+
+### Ubuntu/Linux
 ```bash
-# Install system dependencies (macOS)
-brew install qt@5
+git clone https://github.com/yourusername/canannounce.git
+cd canannounce
+sudo apt update
+sudo apt install python3-pip python3-venv qt5-default
+chmod +x install_dependencies.sh
+./install_dependencies.sh
+```
+
+### Manual Installation (All Platforms)
+```bash
+# Install system dependencies (platform-specific)
+# macOS: brew install qt@5
+# Ubuntu: sudo apt install qt5-default
+# Windows: Dependencies handled by pip
 
 # Install Python dependencies
 pip install -r requirements.txt
@@ -68,13 +86,31 @@ pip install -r requirements.txt
 
 ### Desktop Application (Recommended)
 ```bash
+# All platforms
 python main.py
 ```
 
 ### Web Interface Only
 ```bash
+# All platforms
 python main_web.py
 ```
+
+## Platform-Specific Notes
+
+### Windows Users
+- Use `install_dependencies.bat` instead of the shell script
+- Some antivirus software may flag the executable - this is normal for PyQt5 applications
+- If PyQt5 installation fails, install Visual Studio Build Tools
+
+### Linux Users
+- Install Qt5 development packages: `sudo apt install qt5-default libqt5gui5-dev`
+- Use `python3` instead of `python` on most distributions
+- Some distributions may require `python3-pip` package
+
+### macOS Users
+- Install Homebrew Qt5 for best compatibility: `brew install qt@5`
+- Apple Silicon (M1/M2) users may need Rosetta for some PyQt5 dependencies
 
 ## Configuration Options
 
@@ -87,13 +123,32 @@ python main_web.py
 ## Troubleshooting
 
 ### PyQt5 Installation Issues
-If you encounter "metadata-generation-failed" errors:
+**All Platforms:**
 ```bash
-# Try the automated installer
-./install_dependencies.sh
+# Try the automated installer first
+./install_dependencies.sh  # macOS/Linux
+install_dependencies.bat   # Windows
+```
 
-# Or install Qt system libraries first
+**Platform-specific solutions:**
+
+**macOS:**
+```bash
 brew install qt@5
+export PATH="/opt/homebrew/opt/qt@5/bin:$PATH"  # Apple Silicon
+# or export PATH="/usr/local/opt/qt@5/bin:$PATH"  # Intel
+pip install PyQt5
+```
+
+**Windows:**
+```cmd
+# Install Visual Studio Build Tools if needed
+pip install --only-binary=all PyQt5
+```
+
+**Ubuntu/Linux:**
+```bash
+sudo apt install qt5-default libqt5gui5-dev
 pip install PyQt5
 ```
 
@@ -106,15 +161,16 @@ pip install PyQt5
 
 ```
 canannounce/
-├── main.py              # Desktop application entry point
-├── main_web.py          # Web-only version
-├── app.py               # Flask web server
-├── config_template.py   # Configuration template
-├── requirements.txt     # Python dependencies
-├── install_dependencies.sh  # Automated installer
-├── templates/           # HTML templates
-├── static/             # CSS and JS files
-└── utils/              # Utility modules
+├── main.py                    # Desktop application entry point
+├── main_web.py               # Web-only version
+├── app.py                    # Flask web server
+├── config_template.py        # Configuration template
+├── requirements.txt          # Python dependencies
+├── install_dependencies.sh   # Unix/Linux installer
+├── install_dependencies.bat  # Windows installer
+├── templates/                # HTML templates
+├── static/                   # CSS and JS files
+└── utils/                    # Utility modules
 ```
 
 ## Contributing
@@ -124,6 +180,13 @@ canannounce/
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+## Continuous Integration
+
+This project is tested on multiple platforms using GitHub Actions:
+- **Ubuntu Latest** - Python 3.8, 3.9, 3.10, 3.11
+- **macOS Latest** - Python 3.8, 3.9, 3.10, 3.11  
+- **Windows Latest** - Python 3.8, 3.9, 3.10, 3.11
 
 ## Security Notes
 
@@ -147,3 +210,8 @@ If you encounter issues:
 1. Check the [Troubleshooting](#troubleshooting) section
 2. Search existing [Issues](https://github.com/yourusername/canannounce/issues)
 3. Create a new issue with detailed information
+
+For platform-specific issues, please include:
+- Operating system and version
+- Python version (`python --version`)
+- Error messages or logs
