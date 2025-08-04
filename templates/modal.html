@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Announcement</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/canvas-lms-like-styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Debug: TinyMCE API Key = {{ tinymce_api_key }} -->
+    <script src="https://cdn.tiny.cloud/1/{{ tinymce_api_key }}/tinymce/5/tinymce.min.js" referrerpolicy="origin"></script>
+</head>
+<body>
+    <div class="container" style="margin-top: 5px; max-width: 1100px; max-height: 95vh; overflow-y: auto;">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h1 class="h5 mb-0">Create Announcement</h1>
+            </div>
+            <div class="card-body">
+                <form id="announcementForm">
+                    <input type="hidden" name="course_id" value="{{ course_id }}">
+
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Title</label>
+                        <input type="text" id="title" name="title" class="form-control" value="{{ default_title }}" required>
+                    </div>
+
+                    <div class="mb-3" id="publish-date-container" style="background-color: transparent; border: 1px solid transparent; border-radius: 5px; padding: 10px; transition: background-color 0.3s ease, border-color 0.3s ease;">
+                        <label for="publish_date_picker" class="form-label">Publish Date & Time</label>
+                        <div class="d-flex align-items-center">
+                            <input type="datetime-local" id="publish_date_picker" name="publish_date" class="form-control" value="{{ default_publish_datetime }}" style="width: 25%;">
+                            <div id="publish-warning-message" class="ms-3 flex-grow-1" style="display: none; color: #856404; font-weight: 500; min-height: 1.2em;"></div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="body" class="form-label">Body</label>
+                        <textarea id="body" name="body" class="form-control" rows="10" required>{{ default_body }}</textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="file" class="form-label">Upload File</label>
+                        <input type="file" id="file" name="file" class="form-control">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Debug: Log the API key to console
+        console.log('TinyMCE API Key:', '{{ tinymce_api_key }}');
+
+        // Check if TinyMCE loaded successfully
+        if (typeof tinymce === 'undefined') {
+            console.error('TinyMCE failed to load. Check the API key and network connection.');
+            alert('Rich text editor failed to load. Please check your internet connection.');
+        } else {
+            console.log('TinyMCE loaded successfully');
+
+            // Initialize TinyMCE rich text editor with safer configuration
+            tinymce.init({
+                selector: '#body',
+                height: 250,  // Reduced from 400 to 250 pixels
+                menubar: false,
+                branding: false,
+                elementpath: false,
+                skin: 'oxide',
+                resize: 'vertical',  // Allow vertical resizing
+                plugins: [
+                    'lists', 'link', 'preview', 'code', 'table', 'paste'
+                ],
+                toolbar: 'undo redo | formatselect | ' +
+                    'bold italic | alignleft aligncenter alignright | ' +
+                    'bullist numlist | link | code | preview',
+                content_style: 'body { font-family: Helvetica, Arial, sans-serif; font-size: 14px; }',
+                paste_as_text: false,
+                paste_auto_cleanup_on_paste: true,
+                forced_root_block: 'p',
+                convert_urls: false,
+                relative_urls: false,
+                // Custom content CSS to ensure good contrast
+                content_css: [
+                    '//fonts.googleapis.com/css?family=Lato:300,300i,400,400i',
+                ],
+                // Override toolbar button styles for better contrast
+                setup: function (editor) {
+                    editor.on('change', function () {
+                        editor.save();
+                    });
+
+                    // Add resize handler to ensure submit button remains visible
+                    editor.on('ResizeEditor', function() {
+                        setTimeout(function() {
+                            const submitButton = document.querySelector('button[type="submit"]');
+                            if (submitButton) {
+                                submitButton.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            }
+                        }, 100);
+                    });
+
+                    // Add custom CSS after editor loads
+                    editor.on('init', function() {
+                        // Inject custom CSS for better button contrast
+                        const style = document.createElement('style');
+                        style.textContent = `
+                            .tox .tox-toolbar__group .tox-tbtn {
+                                background-color: #f8f9fa !important;
+                                border: 1px solid #dee2e6 !important;
+                                color: #212529 !important;
+                            }
+                            .tox .tox-toolbar__group .tox-tbtn:hover {
+                                background-color: #e9ecef !important;
+                                border-color: #adb5bd !important;
+                            }
+                            .tox .tox-toolbar__group .tox-tbtn--enabled {
+                                background-color: #007bff !important;
+                                color: white !important;
+                            }
+                            .tox .tox-toolbar {
+                                background-color: #ffffff !important;
+                                border-bottom: 1px solid #dee2e6 !important;
+                            }
+                            .tox-tinymce {
+                                border: 1px solid #ced4da !important;
+                                border-radius: 0.375rem !important;
+                            }
+                            .tox .tox-edit-area__iframe {
+                                background-color: #ffffff !important;
+                            }
+                        `;
+                        document.head.appendChild(style);
+                    });
+                },
+                init_instance_callback: function (editor) {
+                    console.log('TinyMCE initialized successfully for element:', editor.id);
+                },
+                onerror: function(error) {
+                    console.error('TinyMCE initialization error:', error);
+                }
+            });
+        }
+
+        // Function to check if publish time is within 10 minutes and apply warning styling
+        function checkPublishTimeWarning() {
+            const publishDatePicker = document.getElementById('publish_date_picker');
+            const container = document.getElementById('publish-date-container');
+            const warningMessage = document.getElementById('publish-warning-message');
+
+            if (!publishDatePicker.value) {
+                // Empty value means immediate publish - apply warning
+                container.style.backgroundColor = '#fff3cd';
+                container.style.borderColor = '#ffeaa7';
+                warningMessage.textContent = 'Warning: This announcement will be published immediately.';
+                warningMessage.style.display = 'block';
+                return;
+            }
+
+            const selectedDate = new Date(publishDatePicker.value);
+            const now = new Date();
+            const tenMinutesFromNow = new Date(now.getTime() + 10 * 60 * 1000);
+
+            if (selectedDate <= tenMinutesFromNow) {
+                // Within 10 minutes - apply warning styling
+                container.style.backgroundColor = '#fff3cd';
+                container.style.borderColor = '#ffeaa7';
+                warningMessage.textContent = 'Warning: This announcement is scheduled to be published within the next 10 minutes.';
+                warningMessage.style.display = 'block';
+            } else {
+                // Remove warning styling
+                container.style.backgroundColor = 'transparent';
+                container.style.borderColor = 'transparent';
+                warningMessage.style.display = 'none';
+            }
+        }
+
+        // Check warning on page load and when date changes
+        document.addEventListener('DOMContentLoaded', function() {
+            checkPublishTimeWarning();
+            document.getElementById('publish_date_picker').addEventListener('change', checkPublishTimeWarning);
+            document.getElementById('publish_date_picker').addEventListener('input', checkPublishTimeWarning);
+        });
+
+        document.getElementById('announcementForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            // Make sure TinyMCE content is saved to the textarea
+            if (tinymce.activeEditor) {
+                tinymce.activeEditor.save();
+            }
+
+            const formData = new FormData(this);
+
+            try {
+                const response = await fetch('/submit', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Check if this is a warning that requires confirmation
+                    if (result.warning) {
+                        const confirmSubmit = confirm(result.message);
+                        if (confirmSubmit) {
+                            // User confirmed, resubmit with force_submit flag
+                            formData.append('force_submit', 'true');
+                            const forceResponse = await fetch('/submit', {
+                                method: 'POST',
+                                body: formData
+                            });
+                            const forceResult = await forceResponse.json();
+
+                            if (forceResponse.ok && forceResult.success) {
+                                alert(forceResult.message);
+
+                                // Check if shutdown was requested
+                                if (forceResult.shutdown) {
+                                    // Signal the PyQt5 application to close by changing page title
+                                    document.title = "SHUTDOWN_REQUESTED";
+
+                                    // Attempt to close via various methods
+                                    try {
+                                        window.close();
+                                    } catch (e) {
+                                        window.location.href = "about:blank";
+                                    }
+                                }
+                            } else {
+                                alert(forceResult.error || 'An error occurred while submitting the form.');
+                            }
+                        }
+                        // If user cancels, do nothing - stay on the form
+                        return;
+                    }
+
+                    // Normal success case
+                    if (result.success) {
+                        alert(result.message);
+
+                        // Check if shutdown was requested
+                        if (result.shutdown) {
+                            // Signal the PyQt5 application to close by changing page title
+                            document.title = "SHUTDOWN_REQUESTED";
+
+                            // Attempt to close via various methods
+                            try {
+                                // Try standard window close
+                                window.close();
+                            } catch (e) {
+                                // If that fails, try to navigate away to trigger cleanup
+                                window.location.href = "about:blank";
+                            }
+                        }
+                    }
+                } else {
+                    alert(result.error);
+                }
+            } catch (error) {
+                console.error('Error submitting form:', error);
+                alert('An error occurred while submitting the form.');
+            }
+        });
+    </script>
+</body>
+</html>
