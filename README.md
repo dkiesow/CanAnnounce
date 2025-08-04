@@ -181,13 +181,6 @@ canannounce/
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## Continuous Integration
-
-This project is tested on multiple platforms using GitHub Actions:
-- **Ubuntu Latest** - Python 3.8, 3.9, 3.10, 3.11
-- **macOS Latest** - Python 3.8, 3.9, 3.10, 3.11  
-- **Windows Latest** - Python 3.8, 3.9, 3.10, 3.11
-
 ## Security Notes
 
 - Never commit `config.py` to version control
