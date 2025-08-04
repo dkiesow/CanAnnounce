@@ -22,13 +22,8 @@ def test_canvas_api(token, base_url):
     response = requests.get(url, headers=headers)
 
     if response.status_code == 200:
-        print('Authentication successful!')
-        print('User profile:')
-        print(response.json())
         return response.json()
     else:
-        print(f'Authentication failed. Status code: {response.status_code}')
-        print(response.text)
         return None
 
 
