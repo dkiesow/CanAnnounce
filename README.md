@@ -116,7 +116,7 @@ python main_web.py
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| `ANNOUNCEMENT_PUBLISH` | Publish immediately when no date selected | `False` |
+| `ANNOUNCEMENT_NOW` | Publish immediately when no date selected | `False` |
 | `DEFAULT_COURSE_ID` | Default course ID | `''` |
 | `UPCOMING_ASSIGNMENT_DAYS` | Days ahead to fetch assignments | `60` |
 

@@ -7,61 +7,6 @@ from PyQt5.QtWidgets import QApplication, QMainWindow
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import QUrl
 
-def test_canvas_api(token, base_url):
-    """
-    Test Canvas API authentication by fetching the current user's profile.
-    Args:
-        token (str): Canvas API access token.
-        base_url (str): Base URL of the Canvas instance (e.g., https://canvas.instructure.com)
-    Returns:
-        dict: User profile if successful, None otherwise.
-    """
-    headers = {
-        'Authorization': f'Bearer {token}'
-    }
-    url = f'{base_url}/api/v1/users/self/profile'
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        print('Authentication successful!')
-        print('User profile:')
-        print(response.json())
-        return response.json()
-    else:
-        print(f'Authentication failed. Status code: {response.status_code}')
-        print(response.text)
-        return None
-
-
-def get_canvas_courses(token, base_url):
-    """
-    Fetch a list of courses the user has access to.
-    Args:
-        token (str): Canvas API access token.
-        base_url (str): Base URL of the Canvas instance.
-    Returns:
-        list: List of courses if successful, None otherwise.
-    """
-    headers = {
-        'Authorization': f'Bearer {token}'
-    }
-    params = {
-        'enrollment_state': 'active',
-        'state': 'available'
-    }
-    url = f'{base_url}/api/v1/courses'
-    response = requests.get(url, headers=headers, params=params)
-    if response.status_code == 200:
-        courses = response.json()
-        print('Courses:')
-        for course in courses:
-            print(f"- {course.get('name', 'Unnamed Course')} (ID: {course.get('id')})")
-        return courses
-    else:
-        print(f'Failed to fetch courses. Status code: {response.status_code}')
-        print(response.text)
-        return None
-
-
 class FlaskWindow(QMainWindow):
     def __init__(self, url):
         super().__init__()
@@ -98,6 +43,8 @@ class FlaskWindow(QMainWindow):
 if __name__ == '__main__':
     # Import Canvas token and base URL from config.py
     from config import canvas_token, canvas_base_url
+    from utils.canvas_api import test_canvas_api, get_canvas_courses
+
     CANVAS_TOKEN = canvas_token
     CANVAS_BASE_URL = canvas_base_url
     test_canvas_api(CANVAS_TOKEN, CANVAS_BASE_URL)

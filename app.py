@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify
 import os
 from announcement_utils import upload_file_to_course, calculate_trimmed_title
 from course_utils import get_upcoming_assignments, get_canvas_courses, get_course_details
-from config import canvas_token, canvas_base_url, ANNOUNCEMENT_PUBLISH, TINYMCE_API_KEY
+from config import canvas_token, canvas_base_url, ANNOUNCEMENT_NOW, TINYMCE_API_KEY
 from datetime import datetime, timedelta, timezone
 import requests
 import sys
@@ -16,17 +16,11 @@ def index():
     course_name = request.args.get('course_name', 'Unnamed Course')
     upcoming_assignments = get_upcoming_assignments(canvas_token, canvas_base_url, course_id)
 
-    # Log a warning if course_name is missing
-    if course_name == 'Unnamed Course':
-        print("Warning: course_name is missing. Ensure it is passed as a query parameter.")
-
     # Fetch course details if course_name is missing
     if course_name == 'Unnamed Course' and course_id:
         course_details = get_course_details(canvas_token, canvas_base_url, course_id)
         if course_details and 'name' in course_details:
             course_name = course_details['name']
-        else:
-            print("Warning: Failed to fetch course name from Canvas API.")
 
     # Determine publish date - default to 5 minutes from now in CDT
     cdt = timezone(timedelta(hours=-5))  # CDT is UTC-5
@@ -110,7 +104,7 @@ def submit_announcement():
                 delayed_post_at = user_datetime_utc.isoformat()
             except ValueError:
                 return jsonify({'error': 'Invalid publish date format.'}), 400
-        elif not ANNOUNCEMENT_PUBLISH:
+        elif not ANNOUNCEMENT_NOW:
             # Fallback to 30 days in future if no date selected and immediate publish is disabled
             delayed_post_at = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
 
@@ -166,13 +160,7 @@ def select_course():
 
     # Ensure filtering logic completes before rendering the template
     if not courses:
-        print("No courses available after filtering.")
         return render_template('select_course.html', courses=[]), 200
-
-    # Log the filtered courses for debugging
-    print("Filtered courses for selection:")
-    for course in courses:
-        print(f"- {course.get('name', 'Unnamed Course')} (ID: {course.get('id')})")
 
     # Render the course selection template with the filtered courses
     return render_template('select_course.html', courses=courses)
@@ -181,10 +169,6 @@ def select_course():
 def course_selected():
     course_id = request.form.get('course_id')
     course_name = request.form.get('course_name', 'Unnamed Course')
-
-    # Debugging: Log course_name and course_id
-    print(f"Debug: Received course_id={course_id}, course_name={course_name}")
-    print(f"Debug: TinyMCE API Key being passed: {TINYMCE_API_KEY}")
 
     # Get upcoming assignments for this course
     upcoming_assignments = get_upcoming_assignments(canvas_token, canvas_base_url, course_id)
@@ -218,22 +202,6 @@ def course_selected():
         tinymce_api_key=TINYMCE_API_KEY,
         default_publish_datetime=default_publish_datetime
     )
-
-@app.route('/debug_static')
-def debug_static():
-    return app.send_static_file('styles.css')
-
-@app.route('/debug_courses')
-def debug_courses():
-    courses = get_canvas_courses(canvas_token, canvas_base_url)
-    if not courses:
-        return jsonify({'error': 'No courses fetched from Canvas API'}), 500
-
-    filtered_courses = filter_courses_by_role(canvas_token, canvas_base_url, courses, role="teacher")
-    if not filtered_courses:
-        return jsonify({'error': 'No courses available after filtering by role'}), 500
-
-    return jsonify({'courses': filtered_courses}), 200
 
 if __name__ == '__main__':
     import socket
