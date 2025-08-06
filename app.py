@@ -2,10 +2,11 @@ from flask import Flask, render_template, request, jsonify
 import os
 from announcement_utils import upload_file_to_course, calculate_trimmed_title
 from course_utils import get_upcoming_assignments, get_canvas_courses, get_course_details
-from config import canvas_token, canvas_base_url, ANNOUNCEMENT_NOW, TINYMCE_API_KEY
+from config import canvas_token, canvas_base_url, ANNOUNCEMENT_NOW, TINYMCE_API_KEY, INCLUDE_QUIZ_QUESTION, QUIZ_QUESTION_PROMPT
 from datetime import datetime, timedelta, timezone
 import requests
 import sys
+from utils import quiz_utils
 
 # Ensure Flask serves the static folder correctly
 app = Flask(__name__, static_url_path='/static', static_folder='static', template_folder='templates')
@@ -40,7 +41,18 @@ def index():
     # Use the utility function to calculate the default title
     default_title = calculate_trimmed_title(course_name).replace('Slides from', 'Slides from today')
 
-    return render_template('modal.html', course_name=course_name, publish_date=None, default_body=default_body, default_title=default_title, tinymce_api_key=TINYMCE_API_KEY, default_publish_datetime=default_publish_datetime)
+    # Fetch the next quiz question if enabled and add it to the body
+    quiz_question = None
+    if INCLUDE_QUIZ_QUESTION:
+        quiz_question = quiz_utils.get_next_quiz_question(course_id)
+        # Only add quiz section if a valid question was found
+        if quiz_question:
+            default_body += f"\n\n<p><b>{QUIZ_QUESTION_PROMPT}:</b> {quiz_question}</p>"
+
+    return render_template('modal.html', course_name=course_name, publish_date=None, default_body=default_body,
+                           default_title=default_title, tinymce_api_key=TINYMCE_API_KEY,
+                           default_publish_datetime=default_publish_datetime, quiz_question=quiz_question,
+                           quiz_question_prompt=QUIZ_QUESTION_PROMPT)
 
 @app.route('/submit', methods=['POST'])
 def submit_announcement():
@@ -86,7 +98,8 @@ def submit_announcement():
             # Remove the paragraph containing the file placeholder
             body = re.sub(r'<p><a href=\'\[FILE_URL_PLACEHOLDER\]\'>Today\'s slides are here</a></p>\s*', '', body)
             # Also handle double quotes version just in case
-            body = re.sub(r'<p><a href="\[FILE_URL_PLACEHOLDER\]">Today\'s slides are here</a></p>\s*', '', body)
+            body = re.sub(r'<p><a href=\[FILE_URL_PLACEHOLDER\]>Today\'s slides are here</a></p>\s*', '', body)
+            body = re.sub(r'<p><a href=\[FILE_URL_PLACEHOLDER\]>Today\'s slides are here</a></p>\s*', '', body)
 
         # Determine if the announcement should be published immediately or scheduled
         user_publish_date = data.get('publish_date')
@@ -188,6 +201,13 @@ def course_selected():
         )
         default_body += f"<p><b>Upcoming Assignments:</b></p>\n<ul>\n{assignments_html}\n</ul>"
 
+    # Fetch the next quiz question if enabled and add it to the body
+    quiz_question = None
+    if INCLUDE_QUIZ_QUESTION:
+        quiz_question = quiz_utils.get_next_quiz_question(course_id)
+        if quiz_question:
+            default_body += f"\n\n<p><b>{QUIZ_QUESTION_PROMPT}:</b> {quiz_question}</p>"
+
     # Use the utility function to calculate the default title with proper trimming
     default_title = calculate_trimmed_title(course_name)
 
@@ -200,7 +220,9 @@ def course_selected():
         default_body=default_body,
         default_title=default_title,
         tinymce_api_key=TINYMCE_API_KEY,
-        default_publish_datetime=default_publish_datetime
+        default_publish_datetime=default_publish_datetime,
+        quiz_question=quiz_question,
+        quiz_question_prompt=QUIZ_QUESTION_PROMPT
     )
 
 if __name__ == '__main__':

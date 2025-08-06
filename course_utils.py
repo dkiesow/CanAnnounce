@@ -217,12 +217,12 @@ def select_course_and_show_details(token, base_url, course_id):
 
 def get_canvas_courses(token, base_url):
     """
-    Fetch a list of courses where the user has the "teacher" role, handling paginated responses.
+    Fetch a list of courses where the user has the "teacher" role, filtering for current semester courses.
     Args:
         token (str): Canvas API access token.
         base_url (str): Base URL of the Canvas instance.
     Returns:
-        list: List of courses where the user is a teacher.
+        list: List of courses where the user is a teacher and that are active in the current semester.
     """
     headers = {
         'Authorization': f'Bearer {token}'
@@ -230,7 +230,7 @@ def get_canvas_courses(token, base_url):
     params = {
         'enrollment_state': 'active',
         'state': 'available',
-        'include[]': 'enrollments',  # Include enrollments in the course data
+        'include[]': ['enrollments', 'term'],  # Include both enrollments and term data
         'per_page': 100  # Fetch up to 100 courses per page
     }
     url = f'{base_url}/api/v1/courses'
@@ -260,5 +260,77 @@ def get_canvas_courses(token, base_url):
         course for course in courses
         if any(enrollment.get('type', '').lower() == 'teacher' for enrollment in course.get('enrollments', []))
     ]
-    print('Filtered teacher courses:', teacher_courses)  # Debugging log
-    return teacher_courses
+
+    # Filter for current semester courses
+    current_semester_courses = filter_current_semester_courses(teacher_courses)
+
+    print('Filtered current semester teacher courses:', current_semester_courses)  # Debugging log
+    return current_semester_courses
+
+
+def filter_current_semester_courses(courses):
+    """
+    Filter courses to only include those that are active in the current semester.
+    Args:
+        courses (list): List of courses with term information
+    Returns:
+        list: Filtered list of courses active in the current semester
+    """
+    import datetime
+
+    now = datetime.datetime.now()
+    current_date = now.date()
+
+    current_semester_courses = []
+
+    for course in courses:
+        term = course.get('term', {})
+        if not term:
+            # If no term info, include the course (fallback behavior)
+            current_semester_courses.append(course)
+            continue
+
+        # Check if the course term is currently active
+        start_at = term.get('start_at')
+        end_at = term.get('end_at')
+
+        # Parse term dates if available
+        term_start = None
+        term_end = None
+
+        try:
+            if start_at:
+                term_start = datetime.datetime.fromisoformat(start_at.replace('Z', '+00:00')).date()
+            if end_at:
+                term_end = datetime.datetime.fromisoformat(end_at.replace('Z', '+00:00')).date()
+        except ValueError:
+            # If date parsing fails, include the course
+            current_semester_courses.append(course)
+            continue
+
+        # Determine if course is in current semester
+        is_current_semester = False
+
+        if term_start and term_end:
+            # Course has both start and end dates
+            is_current_semester = term_start <= current_date <= term_end
+        elif term_start and not term_end:
+            # Course has start date but no end date - check if started within last 6 months
+            six_months_ago = current_date - datetime.timedelta(days=180)
+            is_current_semester = term_start >= six_months_ago and term_start <= current_date
+        elif term_end and not term_start:
+            # Course has end date but no start date - check if ends within next 6 months
+            six_months_ahead = current_date + datetime.timedelta(days=180)
+            is_current_semester = current_date <= term_end <= six_months_ahead
+        else:
+            # No term dates available, include the course
+            is_current_semester = True
+
+        # Additional check: if course is marked as published and available
+        workflow_state = course.get('workflow_state', '')
+        is_available = workflow_state in ['available', 'published']
+
+        if is_current_semester and is_available:
+            current_semester_courses.append(course)
+
+    return current_semester_courses
