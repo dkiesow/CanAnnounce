@@ -83,31 +83,36 @@ def get_quiz_questions(course_id, quiz_id, token, base_url):
 
 def get_next_quiz_question(course_id):
     """
-    Get a random question from upcoming quizzes in the course.
+    Get a random question from the next upcoming quiz in the course.
 
     Args:
         course_id (str): Canvas course ID
 
     Returns:
-        str: A random quiz question, or None if no questions found
+        str: A random quiz question from the next due quiz, or None if no questions found
     """
     try:
         quizzes = get_canvas_quizzes(course_id, canvas_token, canvas_base_url)
         if not quizzes:
             return None
 
-        # Get questions from all upcoming quizzes
-        all_questions = []
-        for quiz in quizzes:
-            questions = get_quiz_questions(course_id, quiz['id'], canvas_token, canvas_base_url)
-            if questions:
-                # Filter for questions with text content
-                text_questions = [q for q in questions if q.get('question_text')]
-                all_questions.extend(text_questions)
+        # Get the next quiz (first in the sorted list)
+        next_quiz = quizzes[0]
+        print(f"DEBUG: Getting questions from next quiz: '{next_quiz['title']}' due {next_quiz['due_at']}")
 
-        if all_questions:
+        # Get questions from only the next quiz
+        questions = get_quiz_questions(course_id, next_quiz['id'], canvas_token, canvas_base_url)
+        if not questions:
+            print(f"DEBUG: No questions found in next quiz '{next_quiz['title']}'")
+            return None
+
+        # Filter for questions with text content
+        text_questions = [q for q in questions if q.get('question_text')]
+        print(f"DEBUG: Found {len(text_questions)} text questions in next quiz")
+
+        if text_questions:
             # Select a random question
-            selected_question = random.choice(all_questions)
+            selected_question = random.choice(text_questions)
             question_text = selected_question.get('question_text', '')
 
             # Clean up HTML tags if present
@@ -117,8 +122,10 @@ def get_next_quiz_question(course_id):
 
             # Return the question if it has meaningful content
             if question_text and len(question_text) > 10:
+                print(f"DEBUG: Selected question from quiz '{next_quiz['title']}': {question_text[:50]}...")
                 return question_text
 
+        print(f"DEBUG: No suitable questions found in next quiz '{next_quiz['title']}'")
         return None
 
     except Exception as e:

@@ -232,8 +232,21 @@ def get_upcoming_assignments(token, base_url, course_id, days=None):
                 if assignment.get('due_at'):
                     try:
                         due_date = datetime.datetime.fromisoformat(assignment['due_at'].replace('Z', '+00:00'))
+
+                        # Debug: print the raw due date and formatted date
+                        print(f"DEBUG: Assignment '{assignment.get('name')}' raw due_at: {assignment.get('due_at')}")
+                        print(f"DEBUG: Parsed due_date UTC: {due_date}")
+
+                        # Convert to Central Time for display (CDT/CST)
+                        central_tz = timezone(timedelta(hours=-5))  # CDT (adjust to -6 for CST if needed)
+                        due_date_local = due_date.astimezone(central_tz)
+
+                        print(f"DEBUG: Due date in Central Time: {due_date_local}")
+                        print(f"DEBUG: Formatted date: {due_date_local.strftime('%a %b %d')}")
+
                         if now <= due_date <= future:
-                            assignment['due_at_formatted'] = due_date.strftime('%b %d, %Y')
+                            # Use the local time for formatting display
+                            assignment['due_at_formatted'] = due_date_local.strftime('%a %b %d')
                             assignments.append(assignment)
                     except (ValueError, TypeError) as e:
                         print(f"Error parsing due date for assignment {assignment.get('name')}: {e}")

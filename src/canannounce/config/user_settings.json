@@ -1,0 +1,8 @@
+{
+  "canvas_base_url": "https://umsystem.instructure.com",
+  "DEFAULT_COURSE_ID": "335050",
+  "UPCOMING_ASSIGNMENT_DAYS": 60,
+  "INCLUDE_QUIZ_QUESTION": true,
+  "QUIZ_QUESTION_PROMPT": "Practice question from the next quiz",
+  "ANNOUNCEMENT_NOW": false
+}

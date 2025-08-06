@@ -33,7 +33,10 @@
         <div class="card shadow">
             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                 <h1 class="h5 mb-0">Create Announcement for {{ course_name }}</h1>
-                <button type="button" id="back-to-courses" class="btn btn-sm btn-light">Back to Course Selection</button>
+                <div>
+                    <button type="button" id="settings-button" class="btn btn-sm btn-outline-light me-2">Settings</button>
+                    <button type="button" id="back-to-courses" class="btn btn-sm btn-light">Back to Course Selection</button>
+                </div>
             </div>
             <div class="card-body">
                 <form id="announcementForm" action="/submit" method="POST" enctype="multipart/form-data">
@@ -44,11 +47,11 @@
                         <input type="text" id="title" name="title" class="form-control" value="{{ default_title }}" required>
                     </div>
 
-                    <div class="mb-3" id="publish-date-container" style="background-color: transparent; border: 1px solid transparent; border-radius: 5px; padding: 10px; transition: background-color 0.3s ease, border-color 0.3s ease;">
+                    <div class="mb-3">
                         <label for="publish_date_picker" class="form-label">Publish Date & Time</label>
-                        <div class="d-flex align-items-center">
+                        <div id="publish-date-container" class="d-flex align-items-center" style="background-color: transparent; border: 1px solid transparent; border-radius: 5px; padding: 10px; transition: background-color 0.3s ease, border-color 0.3s ease;">
                             <input type="datetime-local" id="publish_date_picker" name="publish_date" class="form-control" value="{{ default_publish_datetime }}" style="width: 25%;">
-                            <div id="publish-warning-message" class="ms-3 flex-grow-1" style="display: none; color: #856404; font-weight: 500; min-height: 1.2em;"></div>
+                            <div id="publish-warning-message" class="ms-3 flex-grow-1 text-center" style="display: none; color: #856404; font-weight: 500; min-height: 1.2em;"></div>
                         </div>
                     </div>
 
@@ -186,6 +189,19 @@
             {% if not preloaded %}
             const courseId = document.querySelector('input[name="course_id"]').value;
 
+            // Show loading indicator in the editor
+            const loadingMessage = "\n\n<p><i>🔄 Loading assignments and quiz questions...</i></p>";
+
+            // Add loading message to current content
+            let currentContent = '';
+            if (tinymce && tinymce.activeEditor) {
+                currentContent = tinymce.activeEditor.getContent();
+                tinymce.activeEditor.setContent(currentContent + loadingMessage);
+            } else {
+                currentContent = document.getElementById('body').value;
+                document.getElementById('body').value = currentContent + loadingMessage;
+            }
+
             try {
                 console.log('Loading course data asynchronously for course:', courseId);
 
@@ -193,15 +209,7 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    // Get current content from TinyMCE
-                    let currentContent = '';
-                    if (tinymce && tinymce.activeEditor) {
-                        currentContent = tinymce.activeEditor.getContent();
-                    } else {
-                        currentContent = document.getElementById('body').value;
-                    }
-
-                    // Append assignments and quiz content
+                    // Remove loading message and replace with actual content
                     const newContent = currentContent + data.assignments_html + data.quiz_html;
 
                     // Update TinyMCE content
@@ -214,15 +222,8 @@
                     console.log(`Loaded ${data.assignments_count} assignments and quiz data`);
                 } else {
                     console.warn('Failed to load course data:', data.error);
-                    // Still add the fallback content
-                    let currentContent = '';
-                    if (tinymce && tinymce.activeEditor) {
-                        currentContent = tinymce.activeEditor.getContent();
-                    } else {
-                        currentContent = document.getElementById('body').value;
-                    }
-
-                    const fallbackContent = currentContent + data.assignments_html + data.quiz_html;
+                    // Remove loading message and add fallback content
+                    const fallbackContent = currentContent + (data.assignments_html || '') + (data.quiz_html || '');
 
                     if (tinymce && tinymce.activeEditor) {
                         tinymce.activeEditor.setContent(fallbackContent);
@@ -232,7 +233,12 @@
                 }
             } catch (error) {
                 console.error('Error loading course data:', error);
-                // Silently fail - user can still create announcement with basic content
+                // Remove loading message on error
+                if (tinymce && tinymce.activeEditor) {
+                    tinymce.activeEditor.setContent(currentContent);
+                } else {
+                    document.getElementById('body').value = currentContent;
+                }
             }
             {% else %}
             console.log('Course data was preloaded, skipping AJAX request');
@@ -242,6 +248,11 @@
         // Add back button functionality
         document.getElementById('back-to-courses').addEventListener('click', function() {
             window.location.href = '/';
+        });
+
+        // Add settings button functionality
+        document.getElementById('settings-button').addEventListener('click', function() {
+            window.location.href = '/settings';
         });
 
         // Function to check if publish time is within 10 minutes and apply warning styling
@@ -299,13 +310,14 @@
 
             // Check if the placeholder text is still in the content
             if (bodyContent.includes('ENTER BODY TEXT')) {
-                if (!confirm('Your announcement still contains the placeholder text "ENTER BODY TEXT". Are you sure you want to continue?')) {
-                    // User clicked "Cancel", focus on the editor
-                    if (tinymce && tinymce.activeEditor) {
-                        tinymce.activeEditor.focus();
-                    }
-                    return; // Stop form submission
+                alert('Your announcement still contains the placeholder text ENTER BODY TEXT. Please update the content before submitting.');
+                // Focus on the editor and stop form submission
+                if (tinymce && tinymce.activeEditor) {
+                    tinymce.activeEditor.focus();
+                } else {
+                    document.getElementById('body').focus();
                 }
+                return; // Stop form submission
             }
 
             const formData = new FormData(this);

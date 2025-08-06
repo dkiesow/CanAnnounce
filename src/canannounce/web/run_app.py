@@ -20,20 +20,42 @@ src_dir = os.path.abspath(os.path.join(current_dir, '../..'))
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
+# Try to import the settings manager, but handle gracefully if it fails
+try:
+    from canannounce.config.settings_manager import settings_manager
+    SETTINGS_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Settings manager not available: {e}")
+    settings_manager = None
+    SETTINGS_AVAILABLE = False
+
 # Import config from src/canannounce/config/local_settings.py
 config_path = os.path.join(src_dir, 'canannounce', 'config', 'local_settings.py')
 spec = importlib.util.spec_from_file_location('config_module', config_path)
 config = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(config)
 
-# Extract variables from config
-canvas_token = config.canvas_token
-canvas_base_url = config.canvas_base_url
-ANNOUNCEMENT_NOW = getattr(config, 'ANNOUNCEMENT_NOW', True)
-TINYMCE_API_KEY = getattr(config, 'TINYMCE_API_KEY', '')
-INCLUDE_QUIZ_QUESTION = getattr(config, 'INCLUDE_QUIZ_QUESTION', False)
-QUIZ_QUESTION_PROMPT = getattr(config, 'QUIZ_QUESTION_PROMPT', 'Quiz Question')
-UPCOMING_ASSIGNMENT_DAYS = getattr(config, 'UPCOMING_ASSIGNMENT_DAYS', 7)
+# Extract variables from config - use settings manager if available, otherwise fallback to direct config
+if SETTINGS_AVAILABLE:
+    # Use settings manager to get current values (includes user overrides)
+    canvas_token = settings_manager.get_setting('canvas_token', getattr(config, 'canvas_token', ''))
+    canvas_base_url = settings_manager.get_setting('canvas_base_url', getattr(config, 'canvas_base_url', ''))
+    TINYMCE_API_KEY = settings_manager.get_setting('TINYMCE_API_KEY', getattr(config, 'TINYMCE_API_KEY', ''))
+
+    # Create a function to get dynamic settings instead of caching them
+    def get_current_setting(key, default=None):
+        """Get current setting value, including any user overrides."""
+        return settings_manager.get_setting(key, getattr(config, key, default))
+else:
+    # Fallback to direct config loading if settings manager is not available
+    canvas_token = config.canvas_token
+    canvas_base_url = config.canvas_base_url
+    TINYMCE_API_KEY = getattr(config, 'TINYMCE_API_KEY', '')
+
+    # Fallback function when settings manager is not available
+    def get_current_setting(key, default=None):
+        """Get setting from direct config when settings manager is not available."""
+        return getattr(config, key, default)
 
 # Now import utils from the new structure
 from canannounce.utils.announcement_utils import upload_file_to_course, calculate_trimmed_title
@@ -162,6 +184,18 @@ def get_upcoming_assignments_fixed(token, base_url, course_id, days_ahead=60):
                     try:
                         # Convert ISO format to datetime object
                         due_date = dt.datetime.fromisoformat(due_at.replace('Z', '+00:00'))
+
+                        # Debug: print the raw due date and formatted date
+                        print(f"DEBUG: Assignment '{assignment['name']}' raw due_at: {due_at}")
+                        print(f"DEBUG: Parsed due_date UTC: {due_date}")
+
+                        # Convert to Central Time for display (CDT/CST)
+                        central_tz = timezone(timedelta(hours=-5))  # CDT (adjust to -6 for CST if needed)
+                        due_date_local = due_date.astimezone(central_tz)
+
+                        print(f"DEBUG: Due date in Central Time: {due_date_local}")
+                        print(f"DEBUG: Formatted date: {due_date_local.strftime('%a %b %d')}")
+
                         print(f"DEBUG: Checking assignment '{assignment['name']}' with due date {due_date.isoformat()}")
 
                         # Include assignments that are due in the future, within our days_ahead window
@@ -170,7 +204,7 @@ def get_upcoming_assignments_fixed(token, base_url, course_id, days_ahead=60):
                             formatted_assignment = {
                                 'name': assignment['name'],
                                 'due_at': due_date.strftime('%Y-%m-%d %H:%M'),
-                                'due_at_formatted': due_date.strftime('%b %d, %Y'),
+                                'due_at_formatted': due_date_local.strftime('%a %b %d'),
                                 'points_possible': assignment.get('points_possible', 0),
                                 'html_url': assignment.get('html_url', '')
                             }
@@ -261,12 +295,12 @@ def create_app():
                             default_title=default_title,
                             default_body=default_body,
                             default_publish_datetime=default_publish_datetime,
-                            now=ANNOUNCEMENT_NOW,
+                            now=get_current_setting('ANNOUNCEMENT_NOW', False),
                             tinymce_api_key=TINYMCE_API_KEY,
                             upcoming_assignments=[],  # Not needed anymore since we have HTML
                             quiz_question=None,  # Not needed anymore since we have HTML
-                            quiz_question_prompt=QUIZ_QUESTION_PROMPT,
-                            upcoming_assignment_days=UPCOMING_ASSIGNMENT_DAYS,
+                            quiz_question_prompt=get_current_setting('QUIZ_QUESTION_PROMPT', 'Practice Question'),
+                            upcoming_assignment_days=get_current_setting('UPCOMING_ASSIGNMENT_DAYS', 30),
                             preloaded=preloaded)  # Pass this to template for conditional loading
 
     # Add new API endpoint for loading assignments and quiz data asynchronously
@@ -274,17 +308,22 @@ def create_app():
     def get_course_data(course_id):
         """Get assignments and quiz questions for a course asynchronously."""
         try:
+            # Get current settings dynamically
+            current_assignment_days = get_current_setting('UPCOMING_ASSIGNMENT_DAYS', 30)
+            current_include_quiz = get_current_setting('INCLUDE_QUIZ_QUESTION', False)
+            current_quiz_prompt = get_current_setting('QUIZ_QUESTION_PROMPT', 'Practice Question')
+
             # Fetch upcoming assignments
             upcoming_assignments = get_upcoming_assignments_fixed(
                 canvas_token,
                 canvas_base_url,
                 course_id,
-                days_ahead=UPCOMING_ASSIGNMENT_DAYS
+                days_ahead=current_assignment_days
             )
 
             # Fetch quiz question if enabled
             quiz_question = None
-            if INCLUDE_QUIZ_QUESTION:
+            if current_include_quiz:
                 quiz_question = get_next_quiz_question(course_id)
 
             # Build assignments HTML
@@ -306,12 +345,12 @@ def create_app():
 
                 assignments_html = f"<p><b>Upcoming Assignments:</b></p>\n<ul>\n{''.join(assignments_list)}\n</ul>"
             else:
-                assignments_html = f"<p><b>No Assignments are due in the next {UPCOMING_ASSIGNMENT_DAYS} Days</b></p>\n\n"
+                assignments_html = f"<p><b>No Assignments are due in the next {current_assignment_days} Days</b></p>\n\n"
 
             # Build quiz question HTML
             quiz_html = ""
             if quiz_question:
-                quiz_html = f"\n\n<p><b>{QUIZ_QUESTION_PROMPT}:</b> {quiz_question}</p>"
+                quiz_html = f"\n\n<p><b>{current_quiz_prompt}:</b> {quiz_question}</p>"
 
             return jsonify({
                 'success': True,
@@ -322,10 +361,11 @@ def create_app():
 
         except Exception as e:
             print(f"Error fetching course data: {e}")
+            current_assignment_days = get_current_setting('UPCOMING_ASSIGNMENT_DAYS', 30)
             return jsonify({
                 'success': False,
                 'error': str(e),
-                'assignments_html': f"<p><b>No Assignments are due in the next {UPCOMING_ASSIGNMENT_DAYS} Days</b></p>\n\n",
+                'assignments_html': f"<p><b>No Assignments are due in the next {current_assignment_days} Days</b></p>\n\n",
                 'quiz_html': ""
             })
 
@@ -403,6 +443,88 @@ def create_app():
         # Apply filtering to courses
         filtered_courses = filter_courses(courses)
         return jsonify(filtered_courses)
+
+    # Add settings routes (only if settings manager is available)
+    if SETTINGS_AVAILABLE:
+        @app.route('/settings')
+        def settings():
+            """Display the settings page."""
+            message = request.args.get('message')
+            message_type = request.args.get('message_type', 'success')
+
+            # Get non-sensitive settings for user editing
+            user_settings = settings_manager.get_non_sensitive_settings()
+            # Get all settings for display purposes
+            all_settings = settings_manager.get_all_settings()
+
+            return render_template('settings.html',
+                                 settings=user_settings,
+                                 all_settings=all_settings,
+                                 message=message,
+                                 message_type=message_type)
+
+        @app.route('/settings', methods=['POST'])
+        def save_settings():
+            """Save user settings."""
+            try:
+                if request.is_json:
+                    settings_data = request.get_json()
+                else:
+                    # Handle form submission
+                    settings_data = {}
+                    for key in request.form:
+                        value = request.form[key]
+                        # Convert string values to appropriate types
+                        if value.lower() in ['true', 'false']:
+                            settings_data[key] = value.lower() == 'true'
+                        elif value.isdigit():
+                            settings_data[key] = int(value)
+                        else:
+                            settings_data[key] = value
+
+                success = settings_manager.save_user_settings(settings_data)
+
+                # Log the settings change for debugging
+                print(f"Settings saved: {settings_data}")
+                if 'UPCOMING_ASSIGNMENT_DAYS' in settings_data:
+                    print(f"UPCOMING_ASSIGNMENT_DAYS changed to: {settings_data['UPCOMING_ASSIGNMENT_DAYS']}")
+
+                if request.is_json:
+                    return jsonify({'success': success, 'cache_invalidated': True})
+                else:
+                    if success:
+                        return redirect(url_for('settings', message='Settings saved successfully. Assignment cache has been cleared.', message_type='success'))
+                    else:
+                        return redirect(url_for('settings', message='Error saving settings', message_type='danger'))
+
+            except Exception as e:
+                print(f"Error saving settings: {e}")
+                if request.is_json:
+                    return jsonify({'success': False, 'error': str(e)})
+                else:
+                    return redirect(url_for('settings', message=f'Error: {str(e)}', message_type='danger'))
+
+        @app.route('/settings/reset', methods=['POST'])
+        def reset_settings():
+            """Reset user settings to defaults."""
+            try:
+                # Remove user settings file
+                import os
+                if os.path.exists(settings_manager.user_settings_file):
+                    os.remove(settings_manager.user_settings_file)
+
+                # Reload settings
+                settings_manager.load_settings()
+
+                return jsonify({'success': True})
+            except Exception as e:
+                print(f"Error resetting settings: {e}")
+                return jsonify({'success': False, 'error': str(e)})
+    else:
+        # Fallback routes when settings manager is not available
+        @app.route('/settings')
+        def settings():
+            return jsonify({'error': 'Settings functionality not available in this mode'})
 
     return app
 
