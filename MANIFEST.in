@@ -1,0 +1,17 @@
+"""
+MANIFEST.in - Specifies additional files to include in the package
+"""
+include README.md
+include LICENSE
+include CHANGELOG.md
+include requirements.txt
+recursive-include src/canannounce/web/templates *.html
+recursive-include src/canannounce/web/static *.css *.js *.png *.jpg *.ico
+include src/canannounce/config/local_settings_template.py
+global-exclude *.pyc
+global-exclude __pycache__
+global-exclude .git*
+global-exclude *.log
+prune src/canannounce/config/local_settings.py
+prune src/canannounce/config/user_settings.json
+

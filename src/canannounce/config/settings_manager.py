@@ -4,12 +4,34 @@ Handles loading settings from local_settings.py and user_settings.json with fall
 """
 import json
 import os
+import sys
+from pathlib import Path
 from typing import Dict, Any
+
+def get_user_config_dir():
+    """Get the user's config directory for canannounce."""
+    home = Path.home()
+
+    # Platform-specific config directories
+    if sys.platform == "win32":
+        config_dir = home / "AppData" / "Local" / "canannounce"
+    elif sys.platform == "darwin":  # macOS
+        config_dir = home / "Library" / "Application Support" / "canannounce"
+    else:  # Linux and others
+        config_dir = home / ".config" / "canannounce"
+
+    return config_dir
 
 class SettingsManager:
     def __init__(self, config_dir: str = None):
         if config_dir is None:
-            config_dir = os.path.dirname(__file__)
+            # First try user config directory, then fallback to package directory
+            user_config_dir = get_user_config_dir()
+            if (user_config_dir / "local_settings.py").exists():
+                config_dir = str(user_config_dir)
+            else:
+                config_dir = os.path.dirname(__file__)
+
         self.config_dir = config_dir
         self.user_settings_file = os.path.join(config_dir, 'user_settings.json')
         self._default_settings = {}
@@ -20,15 +42,28 @@ class SettingsManager:
         """Load settings from local_settings.py and user_settings.json"""
         # Load default settings from local_settings.py
         try:
-            from . import local_settings
+            # Try to load from user config directory first
+            user_config_dir = get_user_config_dir()
+            user_config_file = user_config_dir / "local_settings.py"
+
+            if user_config_file.exists():
+                # Load from user config directory
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("local_settings", user_config_file)
+                local_settings = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(local_settings)
+            else:
+                # Fallback to package directory
+                from . import local_settings
+
             if hasattr(local_settings, 'CONFIG_SETTINGS'):
                 self._default_settings = local_settings.CONFIG_SETTINGS
             else:
                 # Fallback for legacy format
                 self._create_legacy_config_settings(local_settings)
-        except ImportError:
-            print("Warning: local_settings.py not found, using minimal defaults")
-            local_settings = None
+        except (ImportError, FileNotFoundError):
+            print(f"Warning: local_settings.py not found in {self.config_dir}")
+            print("Run 'canannounce-setup' to create configuration")
             self._create_minimal_defaults()
 
         # Load user settings from JSON file
@@ -60,27 +95,16 @@ class SettingsManager:
             }
 
     def _create_minimal_defaults(self):
-        """Create minimal default settings if no local_settings.py exists"""
+        """Create minimal default settings when no config file is found"""
         self._default_settings = {
-            'ANNOUNCEMENT_NOW': {
-                'value': False,
-                'label': 'Publish Immediately',
-                'description': 'Set to True to publish announcements immediately',
-                'type': 'boolean'
-            },
-            'canvas_token': {
-                'value': '',
-                'label': 'Canvas API Token',
-                'description': 'Canvas API token for authentication',
-                'type': 'string',
-                'sensitive': True
-            },
-            'canvas_base_url': {
-                'value': '',
-                'label': 'Canvas Base URL',
-                'description': 'Canvas base URL for your institution',
-                'type': 'string'
-            }
+            'ANNOUNCEMENT_NOW': False,
+            'canvas_token': '',
+            'canvas_base_url': '',
+            'DEFAULT_COURSE_ID': '',
+            'UPCOMING_ASSIGNMENT_DAYS': 30,
+            'TINYMCE_API_KEY': '',
+            'INCLUDE_QUIZ_QUESTION': True,
+            'QUIZ_QUESTION_PROMPT': 'Practice Question from Upcoming Quiz',
         }
 
     def _load_user_settings(self):

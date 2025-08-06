@@ -28,3 +28,7 @@ uploads/*
 
 # Test files
 test_quiz_rephrasing.py
+
+# Development and internal files
+PRE_UPLOAD_CHECKLIST.md
+migrate_to_new_structure.sh

@@ -5,109 +5,190 @@ A tool for creating and managing Canvas announcements with file attachments and 
 ## Features
 
 - Create Canvas announcements with file attachments
-- Automatically include information about upcoming assignments
+- Automatically include information about upcoming assignments  
 - Option to include a random question from upcoming quizzes
 - Web interface for easy announcement creation
 - Command-line interface for scripting and automation
+- Easy configuration management
+- Timezone-aware date handling
 
-## Installation
+## Quick Start
 
-### Option 1: Install from source
+This was developed and tested ONLY on a Mac. It may work on other platforms, but it is not tested or guaranteed.
+
+### Method 1: One-Click Install (Recommended)
+
+**Linux/macOS:**
+```bash
+git clone https://github.com/yourusername/canannounce.git
+cd canannounce
+chmod +x install.sh
+./install.sh
+```
+
+**Windows:**
+```cmd
+git clone https://github.com/yourusername/canannounce.git
+cd canannounce
+install.bat
+```
+
+### Method 2: Manual Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/canannounce.git
 cd canannounce
 
-# Install the package and dependencies
+# Create virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # Linux/macOS
+# OR
+venv\Scripts\activate.bat  # Windows
+
+# Install
 pip install -e .
 ```
 
-### Option 2: Quick start with the run script
+### Method 3: Install from PyPI (when available)
 
+**Web Interface Only (Default):**
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/canannounce.git
-cd canannounce
+pip install canannounce
+```
 
-# Install dependencies
-pip install -r requirements.txt
+**With Optional GUI Support:**
+```bash
+pip install canannounce[gui]
+```
 
-# Run the web application
-python run.py
+**All Features (GUI + Development Tools):**
+```bash
+pip install canannounce[gui,dev]
 ```
 
 ## Configuration
 
-Create a `config.py` file based on the provided `config_template.py` or set environment variables:
+After installation, run the configuration wizard:
 
-```python
-# Canvas API settings
-canvas_token = 'your_canvas_api_token'
-canvas_base_url = 'https://your-institution.instructure.com'
-
-# TinyMCE API key for rich text editor
-TINYMCE_API_KEY = 'your_tinymce_api_key'
-
-# Announcement settings
-ANNOUNCEMENT_NOW = True  # Set to False to use the scheduled time
-
-# Quiz question settings
-INCLUDE_QUIZ_QUESTION = True  # Set to False to disable quiz questions
-QUIZ_QUESTION_PROMPT = 'Practice Question from Upcoming Quiz'
+```bash
+canannounce-setup
 ```
+
+This will create a configuration file in your user directory:
+- **Linux:** `~/.config/canannounce/local_settings.py`
+- **macOS:** `~/Library/Application Support/canannounce/local_settings.py`  
+- **Windows:** `%APPDATA%\Local\canannounce\local_settings.py`
+
+### Required Configuration
+
+You'll need:
+1. **Canvas Base URL** (e.g., `https://your-school.instructure.com`)
+2. **Canvas API Token** (generate from Canvas Account → Settings → New Access Token)
+3. **TinyMCE API Key** (optional, for rich text editing - get free key from tiny.cloud)
 
 ## Usage
 
-### Web Interface
-
-Start the web server:
+### Web Interface (Recommended)
 
 ```bash
-# Using the package
-canannounce-web
-
-# Or using the run script
-python run.py
+canannounce
 ```
 
-Then open your browser to http://localhost:5000
+Then open your browser to `http://localhost:5000`
 
 ### Command Line
 
-List available courses:
-
 ```bash
-canannounce --list-courses
+canannounce-web  # Alternative web interface command
 ```
 
-Upload a file and create an announcement:
+## File Structure
 
-```bash
-canannounce --course-id 12345 --title "Today's Lecture" --body "<p>Here are today's slides</p>" --file path/to/slides.pdf
+```
+~/.config/canannounce/           # User config directory
+├── local_settings.py            # Main configuration  
+├── user_settings.json          # UI preferences (auto-generated)
+└── README.txt                  # Quick reference
 ```
 
-## Project Structure
+## Configuration Options
 
-The project follows a standard Python package structure:
+Edit your `local_settings.py` file:
 
-- `src/canannounce/`: Main package directory
-  - `api/`: API-related functionality
-  - `config/`: Configuration settings
-  - `core/`: Core functionality like course utilities
-  - `utils/`: Helper functions for quizzes and announcements
-  - `web/`: Flask web application code
-- `static/`: Static assets for the web interface
-- `templates/`: HTML templates for the web interface
+```python
+# Canvas Configuration
+canvas_base_url = "https://your-school.instructure.com"
+canvas_token = "your_api_token_here"
+
+# TinyMCE Configuration (optional)
+TINYMCE_API_KEY = "your_tinymce_key"
+
+# Assignment Settings
+UPCOMING_ASSIGNMENT_DAYS = 30
+
+# Quiz Settings  
+INCLUDE_QUIZ_QUESTION = True
+QUIZ_QUESTION_PROMPT = "Practice Question"
+
+# Announcement Settings
+ANNOUNCEMENT_NOW = False
+```
 
 ## Development
 
-1. Fork and clone the repository
-2. Create a virtual environment: `python -m venv venv`
-3. Activate the environment: `source venv/bin/activate` (Linux/macOS) or `venv\Scripts\activate` (Windows)
-4. Install dev dependencies: `pip install -e ".[dev]"`
-5. Run tests: `pytest`
+### Building from Source
+
+```bash
+# Install development dependencies
+pip install -e .[dev]
+
+# Run tests
+pytest
+
+# Build distribution packages
+chmod +x build_dist.sh
+./build_dist.sh
+```
+
+### Project Structure
+
+```
+src/canannounce/
+├── config/              # Configuration management
+├── core/               # Core Canvas API utilities  
+├── utils/              # Helper utilities
+└── web/                # Web interface
+    ├── templates/      # HTML templates
+    └── static/         # CSS/JS assets
+```
+
+## Troubleshooting
+
+### Configuration Issues
+
+If you get configuration errors:
+```bash
+canannounce-setup  # Re-run setup wizard
+```
+
+### Permission Issues
+
+Make sure your Canvas API token has the required permissions:
+- Read course content
+- Create announcements
+- Upload files
+
+### Timezone Issues
+
+The app automatically converts Canvas UTC timestamps to your local timezone. If dates appear incorrect, check your system timezone settings.
+
+## Support
+
+- **Issues:** [GitHub Issues](https://github.com/yourusername/canannounce/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/yourusername/canannounce/discussions)
+- **Config Location:** Run `canannounce-setup` to see your config directory
 
 ## License
 
-[MIT License](LICENSE)
+MIT License - see LICENSE file for details.
