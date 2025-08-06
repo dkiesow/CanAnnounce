@@ -1,210 +1,113 @@
-# Can Announce
+# CanAnnounce
 
-A desktop application for creating and publishing announcements to Canvas LMS with file attachment support.
+A tool for creating and managing Canvas announcements with file attachments and quiz question integration.
 
-## Platform Support
+## Features
 
-Can Announce may run on multiple operating systems:
-- **macOS** (Primary development platform)
-- **Windows** (With Windows-specific installation script)
-- **Ubuntu/Linux** (Tested via CI/CD)
-
-Non-Mac platforms are not all at effectively tested either for installation or operation. But should work in theory.
-## Requirements
-
-- Python 3.7+
-- Canvas API token
-- TinyMCE API key (free tier available)
-- PyQt5 (for desktop interface)
+- Create Canvas announcements with file attachments
+- Automatically include information about upcoming assignments
+- Option to include a random question from upcoming quizzes
+- Web interface for easy announcement creation
+- Command-line interface for scripting and automation
 
 ## Installation
 
-### macOS (Recommended)
+### Option 1: Install from source
+
 ```bash
+# Clone the repository
 git clone https://github.com/yourusername/canannounce.git
 cd canannounce
-chmod +x install_dependencies.sh
-./install_dependencies.sh
+
+# Install the package and dependencies
+pip install -e .
 ```
 
-### Windows
-```cmd
+### Option 2: Quick start with the run script
+
+```bash
+# Clone the repository
 git clone https://github.com/yourusername/canannounce.git
 cd canannounce
-install_dependencies.bat
-```
 
-### Ubuntu/Linux
-```bash
-git clone https://github.com/yourusername/canannounce.git
-cd canannounce
-sudo apt update
-sudo apt install python3-pip python3-venv qt5-default
-chmod +x install_dependencies.sh
-./install_dependencies.sh
-```
-
-### Manual Installation (All Platforms)
-```bash
-# Install system dependencies (platform-specific)
-# macOS: brew install qt@5
-# Ubuntu: sudo apt install qt5-default
-# Windows: Dependencies handled by pip
-
-# Install Python dependencies
+# Install dependencies
 pip install -r requirements.txt
+
+# Run the web application
+python run.py
 ```
 
-## Setup
+## Configuration
 
-1. **Copy the configuration template:**
-   ```bash
-   cp config_template.py config.py
-   ```
+Create a `config.py` file based on the provided `config_template.py` or set environment variables:
 
-2. **Get your Canvas API token:**
-   - Log into Canvas → Account → Settings
-   - Scroll to "Approved Integrations"
-   - Click "+ New Access Token"
-   - Enter purpose: "Can Announce"
-   - Copy the generated token
+```python
+# Canvas API settings
+canvas_token = 'your_canvas_api_token'
+canvas_base_url = 'https://your-institution.instructure.com'
 
-3. **Get TinyMCE API key (free):**
-   - Visit [tiny.cloud](https://www.tiny.cloud/)
-   - Sign up for free account
-   - Copy API key from dashboard
+# TinyMCE API key for rich text editor
+TINYMCE_API_KEY = 'your_tinymce_api_key'
 
-4. **Configure the app:**
-   Edit `config.py` with your credentials:
-   ```python
-   CANVAS_TOKEN = 'your_canvas_api_token_here'
-   CANVAS_BASE_URL = 'https://your-institution.instructure.com'
-   TINYMCE_API_KEY = 'your_tinymce_api_key_here'
-   ```
+# Announcement settings
+ANNOUNCEMENT_NOW = True  # Set to False to use the scheduled time
+
+# Quiz question settings
+INCLUDE_QUIZ_QUESTION = True  # Set to False to disable quiz questions
+QUIZ_QUESTION_PROMPT = 'Practice Question from Upcoming Quiz'
+```
 
 ## Usage
 
-### Desktop Application (Recommended)
+### Web Interface
+
+Start the web server:
+
 ```bash
-# All platforms
-python main.py
+# Using the package
+canannounce-web
+
+# Or using the run script
+python run.py
 ```
 
-### Web Interface Only
+Then open your browser to http://localhost:5000
+
+### Command Line
+
+List available courses:
+
 ```bash
-# All platforms
-python main_web.py
+canannounce --list-courses
 ```
 
-## Platform-Specific Notes
+Upload a file and create an announcement:
 
-### Windows Users
-- Use `install_dependencies.bat` instead of the shell script
-- Some antivirus software may flag the executable - this is normal for PyQt5 applications
-- If PyQt5 installation fails, install Visual Studio Build Tools
-
-### Linux Users
-- Install Qt5 development packages: `sudo apt install qt5-default libqt5gui5-dev`
-- Use `python3` instead of `python` on most distributions
-- Some distributions may require `python3-pip` package
-
-### macOS Users
-- Install Homebrew Qt5 for best compatibility: `brew install qt@5`
-- Apple Silicon (M1/M2) users may need Rosetta for some PyQt5 dependencies
-
-## Configuration Options
-
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `ANNOUNCEMENT_NOW` | Publish immediately when no date selected | `False` |
-| `DEFAULT_COURSE_ID` | Default course ID | `''` |
-| `UPCOMING_ASSIGNMENT_DAYS` | Days ahead to fetch assignments | `60` |
-
-## Troubleshooting
-
-### PyQt5 Installation Issues
-**All Platforms:**
 ```bash
-# Try the automated installer first
-./install_dependencies.sh  # macOS/Linux
-install_dependencies.bat   # Windows
+canannounce --course-id 12345 --title "Today's Lecture" --body "<p>Here are today's slides</p>" --file path/to/slides.pdf
 ```
-
-**Platform-specific solutions:**
-
-**macOS:**
-```bash
-brew install qt@5
-export PATH="/opt/homebrew/opt/qt@5/bin:$PATH"  # Apple Silicon
-# or export PATH="/usr/local/opt/qt@5/bin:$PATH"  # Intel
-pip install PyQt5
-```
-
-**Windows:**
-```cmd
-# Install Visual Studio Build Tools if needed
-pip install --only-binary=all PyQt5
-```
-
-**Ubuntu/Linux:**
-```bash
-sudo apt install qt5-default libqt5gui5-dev
-pip install PyQt5
-```
-
-### Canvas API Connection Issues
-- Verify your Canvas base URL (no trailing slash)
-- Check that your API token hasn't expired
-- Ensure your token has proper permissions
 
 ## Project Structure
 
-```
-canannounce/
-├── main.py                    # Desktop application entry point
-├── main_web.py               # Web-only version
-├── app.py                    # Flask web server
-├── config_template.py        # Configuration template
-├── requirements.txt          # Python dependencies
-├── install_dependencies.sh   # Unix/Linux installer
-├── install_dependencies.bat  # Windows installer
-├── templates/                # HTML templates
-├── static/                   # CSS and JS files
-└── utils/                    # Utility modules
-```
+The project follows a standard Python package structure:
 
-## Contributing
+- `src/canannounce/`: Main package directory
+  - `api/`: API-related functionality
+  - `config/`: Configuration settings
+  - `core/`: Core functionality like course utilities
+  - `utils/`: Helper functions for quizzes and announcements
+  - `web/`: Flask web application code
+- `static/`: Static assets for the web interface
+- `templates/`: HTML templates for the web interface
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## Development
 
-## Security Notes
-
-- Never commit `config.py` to version control
-- Keep your Canvas API token secure
-- The TinyMCE API key can be shared (it's domain-restricted)
+1. Fork and clone the repository
+2. Create a virtual environment: `python -m venv venv`
+3. Activate the environment: `source venv/bin/activate` (Linux/macOS) or `venv\Scripts\activate` (Windows)
+4. Install dev dependencies: `pip install -e ".[dev]"`
+5. Run tests: `pytest`
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Built with [Flask](https://flask.palletsprojects.com/) and [PyQt5](https://pypi.org/project/PyQt5/)
-- Rich text editing powered by [TinyMCE](https://www.tiny.cloud/)
-- Canvas LMS integration via [Canvas API](https://canvas.instructure.com/doc/api/)
-
-## Support
-
-If you encounter issues:
-1. Check the [Troubleshooting](#troubleshooting) section
-2. Search existing [Issues](https://github.com/yourusername/canannounce/issues)
-3. Create a new issue with detailed information
-
-For platform-specific issues, please include:
-- Operating system and version
-- Python version (`python --version`)
-- Error messages or logs
+[MIT License](LICENSE)

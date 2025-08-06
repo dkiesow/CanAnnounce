@@ -3,22 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create Announcement</title>
+    <title>Create Announcement for {{ course_name }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
-    <link rel="stylesheet" href="/static/canvas-lms-like-styles.css">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Debug: TinyMCE API Key = {{ tinymce_api_key }} -->
     <script src="https://cdn.tiny.cloud/1/{{ tinymce_api_key }}/tinymce/5/tinymce.min.js" referrerpolicy="origin"></script>
+    <style>
+        /* Custom styling for the datetime picker to match body text */
+        input[type="datetime-local"] {
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 14px;
+            padding: 8px 12px;
+            color: #333;
+        }
+        /* Ensure consistency across browsers */
+        input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+        }
+        /* Match form label styling for consistency */
+        .form-label {
+            font-family: Helvetica, Arial, sans-serif;
+            font-weight: 500;
+        }
+    </style>
 </head>
 <body>
     <div class="container" style="margin-top: 5px; max-width: 1100px; max-height: 95vh; overflow-y: auto;">
         <div class="card shadow">
-            <div class="card-header bg-primary text-white">
-                <h1 class="h5 mb-0">Create Announcement</h1>
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h1 class="h5 mb-0">Create Announcement for {{ course_name }}</h1>
+                <button type="button" id="back-to-courses" class="btn btn-sm btn-light">Back to Course Selection</button>
             </div>
             <div class="card-body">
-                <form id="announcementForm">
+                <form id="announcementForm" action="/submit" method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="course_id" value="{{ course_id }}">
 
                     <div class="mb-3">
@@ -89,10 +107,18 @@
                 setup: function (editor) {
                     // Set the initial content when editor is ready
                     editor.on('init', function () {
-                        // Get the content from the textarea (which includes quiz question)
+                        // Debug: Check what's in the textarea
                         const textareaContent = document.getElementById('body').value;
-                        editor.setContent(textareaContent);
-                        console.log('TinyMCE content set:', textareaContent.substring(0, 100) + '...');
+                        console.log('Raw textarea content:', textareaContent);
+
+                        // Ensure we're setting HTML content properly
+                        editor.setContent(textareaContent, {format: 'html'});
+
+                        // Force a refresh of the editor after setting content
+                        setTimeout(function() {
+                            editor.execCommand('mceRepaint');
+                            console.log('TinyMCE content refreshed');
+                        }, 100);
                     });
 
                     editor.on('change', function () {
@@ -151,6 +177,11 @@
             });
         }
 
+        // Add back button functionality
+        document.getElementById('back-to-courses').addEventListener('click', function() {
+            window.location.href = '/';
+        });
+
         // Function to check if publish time is within 10 minutes and apply warning styling
         function checkPublishTimeWarning() {
             const publishDatePicker = document.getElementById('publish_date_picker');
@@ -195,8 +226,24 @@
             e.preventDefault();
 
             // Make sure TinyMCE content is saved to the textarea
-            if (tinymce.activeEditor) {
+            if (tinymce && tinymce.activeEditor) {
                 tinymce.activeEditor.save();
+            } else {
+                console.warn("TinyMCE editor not initialized");
+            }
+
+            // Get the current content from the textarea
+            const bodyContent = document.getElementById('body').value;
+
+            // Check if the placeholder text is still in the content
+            if (bodyContent.includes('ENTER BODY TEXT')) {
+                if (!confirm('Your announcement still contains the placeholder text "ENTER BODY TEXT". Are you sure you want to continue?')) {
+                    // User clicked "Cancel", focus on the editor
+                    if (tinymce && tinymce.activeEditor) {
+                        tinymce.activeEditor.focus();
+                    }
+                    return; // Stop form submission
+                }
             }
 
             const formData = new FormData(this);
@@ -206,99 +253,54 @@
                     method: 'POST',
                     body: formData
                 });
-                const result = await response.json();
 
-                if (response.ok) {
-                    // Check if this is a warning that requires confirmation
-                    if (result.warning) {
-                        const confirmSubmit = confirm(result.message);
-                        if (confirmSubmit) {
-                            // User confirmed, resubmit with force_submit flag
-                            formData.append('force_submit', 'true');
-                            const forceResponse = await fetch('/submit', {
-                                method: 'POST',
-                                body: formData
-                            });
-                            const forceResult = await forceResponse.json();
+                if (!response.ok) {
+                    throw new Error(`Server responded with status: ${response.status}`);
+                }
 
-                            if (forceResponse.ok && forceResult.success) {
-                                alert(forceResult.message);
+                let result;
+                try {
+                    result = await response.json();
+                } catch (jsonError) {
+                    console.error("Failed to parse JSON response:", jsonError);
+                    throw new Error("Invalid response from server");
+                }
 
-                                // Check if shutdown was requested
-                                if (forceResult.shutdown) {
-                                    // Signal the PyQt5 application to close by changing page title
-                                    document.title = "SHUTDOWN_REQUESTED";
+                if (result.success) {
+                    alert(result.message || "Announcement created successfully!");
+                    // Optionally redirect back to course selection
+                    window.location.href = '/';
+                } else if (result.warning) {
+                    const confirmSubmit = confirm(result.message);
+                    if (confirmSubmit) {
+                        // User confirmed, resubmit with force_submit flag
+                        formData.append('force_submit', 'true');
+                        const forceResponse = await fetch('/submit', {
+                            method: 'POST',
+                            body: formData
+                        });
 
-                                    // Attempt to close via various methods
-                                    try {
-                                        window.close();
-                                    } catch (e) {
-                                        window.location.href = "about:blank";
-                                    }
-                                }
-                            } else {
-                                alert(forceResult.error || 'An error occurred while submitting the form.');
-                            }
+                        if (!forceResponse.ok) {
+                            throw new Error(`Server responded with status: ${forceResponse.status}`);
                         }
-                        // If user cancels, do nothing - stay on the form
-                        return;
-                    }
 
-                    // Normal success case
-                    if (result.success) {
-                        alert(result.message);
+                        const forceResult = await forceResponse.json();
 
-                        // Check if shutdown was requested
-                        if (result.shutdown) {
-                            // Signal the PyQt5 application to close by changing page title
-                            document.title = "SHUTDOWN_REQUESTED";
-
-                            // Attempt to close via various methods
-                            try {
-                                // Try standard window close
-                                window.close();
-                            } catch (e) {
-                                // If that fails, try to navigate away to trigger cleanup
-                                window.location.href = "about:blank";
-                            }
+                        if (forceResult.success) {
+                            alert(forceResult.message || "Announcement created successfully!");
+                            window.location.href = '/';
+                        } else {
+                            alert(forceResult.error || "Error creating announcement");
                         }
                     }
                 } else {
-                    alert(result.error);
+                    alert(result.error || "Error creating announcement");
                 }
             } catch (error) {
                 console.error('Error submitting form:', error);
-                alert('An error occurred while submitting the form.');
+                alert('An error occurred while submitting the form: ' + error.message);
             }
         });
-
-        document.addEventListener('DOMContentLoaded', function () {
-                let editorContent = `{{ default_body }}`;
-
-                // Append upcoming assignments if they exist
-                const assignmentsHtml = `{% if upcoming_assignments %}<p><b>Upcoming Assignments:</b></p><ul>{% for assignment in upcoming_assignments %}<li>{{ assignment.name }} (Due: {{ assignment.due_at }})</li>{% endfor %}</ul>{% endif %}`;
-                editorContent += assignmentsHtml;
-
-                // Append quiz question if it exists
-                const quizHtml = `{% if quiz_question %}<p><b>{{ quiz_question_prompt }}</b></p><p>{{ quiz_question }}</p>{% endif %}`;
-                editorContent += quizHtml;
-
-                if (typeof tinymce !== 'undefined') {
-                    tinymce.init({
-                        selector: '#body',
-                        height: 250,
-                        menubar: false,
-                        branding: false,
-                        plugins: ['lists', 'link', 'preview', 'code', 'table', 'paste'],
-                        toolbar: 'undo redo | formatselect | bold italic | alignleft aligncenter alignright | bullist numlist | link | code | preview',
-                        setup: function (editor) {
-                            editor.on('init', function () {
-                                editor.setContent(editorContent);
-                            });
-                        }
-                    });
-                }
-            });
     </script>
 </body>
 </html>

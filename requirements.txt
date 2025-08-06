@@ -1,5 +1,5 @@
-Flask==2.3.3
-PyQt5==5.15.9
-PyQtWebEngine==5.15.6
-requests==2.31.0
-Werkzeug==2.3.7
+flask>=2.0.0
+requests>=2.25.0
+PyPDF2>=2.0.0
+python-dateutil>=2.8.2
+
