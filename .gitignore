@@ -13,8 +13,18 @@ build/
 htmlcov/
 .pytest_cache/
 src/canannounce/config/local_settings.py
+config.py
 .idea/
 .DS_Store
 uploads/*
 !uploads/.gitkeep
 
+# Legacy files now in src/canannounce structure
+/main.py
+/main_web.py
+/static/
+/templates/
+/utils/
+
+# Test files
+test_quiz_rephrasing.py
