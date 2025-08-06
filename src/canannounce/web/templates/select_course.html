@@ -20,15 +20,15 @@
     {% endif %}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <style>
-    /* Force views to be properly hidden/shown based on course_id */
-    .course-selection-view { display: {% if course_id %}none{% else %}block{% endif %}; }
-    .announcement-creation-view { display: {% if course_id %}block{% else %}none{% endif %}; }
+    /* This ensures only one view is displayed by hiding the other when not needed */
+    #course-selection-view { display: {% if course_id %}none{% else %}block{% endif %}; }
+    #announcement-creation-view { display: {% if course_id %}block{% else %}none{% endif %}; }
     </style>
 </head>
 <body>
     <div class="container mt-2">
         <!-- COURSE SELECTION VIEW -->
-        <div class="course-selection-view card shadow">
+        <div id="course-selection-view" class="card shadow">
             <div class="card-header bg-primary text-white">
                 <h1 class="h5 mb-0">Select a Course</h1>
             </div>
@@ -49,7 +49,7 @@
         </div>
 
         <!-- ANNOUNCEMENT CREATION VIEW -->
-        <div class="announcement-creation-view card shadow">
+        <div id="announcement-creation-view" class="card shadow">
             <div class="card-header bg-primary text-white">
                 <h1 class="h5 mb-0">Create Announcement for {{ course_name }}</h1>
             </div>
