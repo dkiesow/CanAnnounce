@@ -7,22 +7,22 @@ import os
 import sys
 import importlib.util
 from flask import Flask, render_template, request, jsonify, redirect, url_for
-from datetime import datetime, timedelta, timezone
+import datetime as dt
+from datetime import timedelta, timezone
 import pathlib
 import requests  # Import requests for direct API calls
 
 # Determine the project root directory (not just src)
 current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(current_dir, "../../.."))  # This is the correct path to the project root
-src_dir = os.path.abspath(os.path.join(current_dir, "../.."))
+src_dir = os.path.abspath(os.path.join(current_dir, '../..'))
 
-# Add project root to Python path
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+# Add src to Python path
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
 
-# Import config directly from file path using importlib
-config_path = os.path.join(project_root, "config.py")
-spec = importlib.util.spec_from_file_location("config_module", config_path)
+# Import config from src/canannounce/config/local_settings.py
+config_path = os.path.join(src_dir, 'canannounce', 'config', 'local_settings.py')
+spec = importlib.util.spec_from_file_location('config_module', config_path)
 config = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(config)
 
@@ -35,18 +35,10 @@ INCLUDE_QUIZ_QUESTION = getattr(config, 'INCLUDE_QUIZ_QUESTION', False)
 QUIZ_QUESTION_PROMPT = getattr(config, 'QUIZ_QUESTION_PROMPT', 'Quiz Question')
 UPCOMING_ASSIGNMENT_DAYS = getattr(config, 'UPCOMING_ASSIGNMENT_DAYS', 7)
 
-# Now import utils from the original structure
-from utils.canvas_api import test_canvas_api, get_canvas_courses
-from utils.course_utils import get_upcoming_assignments, get_course_details
-from utils.quiz_utils import get_next_quiz_question
-
-# Import announcement_utils directly using importlib to avoid package issues
-announcement_utils_path = os.path.join(src_dir, "canannounce", "utils", "announcement_utils.py")
-spec = importlib.util.spec_from_file_location("announcement_utils", announcement_utils_path)
-announcement_utils = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(announcement_utils)
-upload_file_to_course = announcement_utils.upload_file_to_course
-calculate_trimmed_title = announcement_utils.calculate_trimmed_title
+# Now import utils from the new structure
+from canannounce.utils.announcement_utils import *
+from canannounce.utils.quiz_utils import *
+from canannounce.core.course_utils import *
 
 # Define a function to filter courses based on the original filtering rules
 def filter_courses(courses):
@@ -54,7 +46,7 @@ def filter_courses(courses):
     print(f"Starting filtering with {len(courses)} courses")
 
     # Get current date to determine current semester
-    current_date = datetime.now()
+    current_date = dt.datetime.now()
     current_year = current_date.year
     current_month = current_date.month
 
@@ -152,7 +144,7 @@ def get_upcoming_assignments_fixed(token, base_url, course_id, days_ahead=60):
     params = {'per_page': 100}
 
     # Calculate date range
-    now = datetime.now(timezone.utc)
+    now = dt.datetime.now(timezone.utc)
     future_date = now + timedelta(days=days_ahead)
 
     print(f"DEBUG: Looking for assignments between {now.isoformat()} and {future_date.isoformat()}")
@@ -169,7 +161,7 @@ def get_upcoming_assignments_fixed(token, base_url, course_id, days_ahead=60):
                 if due_at:
                     try:
                         # Convert ISO format to datetime object
-                        due_date = datetime.fromisoformat(due_at.replace('Z', '+00:00'))
+                        due_date = dt.datetime.fromisoformat(due_at.replace('Z', '+00:00'))
                         print(f"DEBUG: Checking assignment '{assignment['name']}' with due date {due_date.isoformat()}")
 
                         # Include assignments that are due in the future, within our days_ahead window
@@ -269,7 +261,7 @@ def create_app():
 
         # Determine publish date - default to 5 minutes from now in CDT
         cdt = timezone(timedelta(hours=-5))  # CDT is UTC-5
-        now_cdt = datetime.now(cdt)
+        now_cdt = dt.datetime.now(cdt)
         future_date_cdt = now_cdt + timedelta(minutes=5)
         # Format for datetime-local input
         default_publish_datetime = future_date_cdt.strftime('%Y-%m-%dT%H:%M')
