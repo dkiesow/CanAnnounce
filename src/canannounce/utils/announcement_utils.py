@@ -139,30 +139,62 @@ def upload_file_to_course(course_id, title, body, file, publish_at=None, token=N
 def calculate_trimmed_title(course_name, max_length=50):
     """
     Generate a trimmed title for announcements based on course name.
+    Extracts course code and adds today's date.
 
     Args:
         course_name (str): The full course name
         max_length (int): Maximum length for the title
 
     Returns:
-        str: Formatted announcement title
+        str: Formatted announcement title like "Slides from today JOURN-4734 8/06"
     """
-    # Remove common course prefixes and suffixes
-    title = course_name
-
-    # Remove semester info (Fall 2025, Spring 2024, etc.)
     import re
-    title = re.sub(r'\b(Fall|Spring|Summer)\s*\d{4}\b', '', title, flags=re.IGNORECASE)
-    title = re.sub(r'\b(FA|SP|SU)\s*\d{2,4}\b', '', title, flags=re.IGNORECASE)
+    from datetime import datetime
 
-    # Remove course codes at the beginning (like "CHEM 101 -")
-    title = re.sub(r'^[A-Z]{2,5}\s*\d{3,4}\s*[-:]?\s*', '', title)
+    # Get today's date in (MM/DD/YY) format
+    today = datetime.now()
+    date_str = f"({today.month:02d}/{today.day:02d}/{str(today.year)[2:]})"
 
-    # Clean up extra whitespace
-    title = ' '.join(title.split())
+    # Extract course code from various formats
+    course_code = None
+
+    # Pattern 1: Extract from format like "2025FS-JOURN-4734-01"
+    match = re.search(r'([A-Z]{3,5}-\d{4})', course_name)
+    if match:
+        course_code = match.group(1)
+    else:
+        # Pattern 2: Extract from format like "JOURN 4734" or "JOURN-4734"
+        match = re.search(r'([A-Z]{3,5})\s*[-\s]\s*(\d{4})', course_name)
+        if match:
+            course_code = f"{match.group(1)}-{match.group(2)}"
+        else:
+            # Pattern 3: Fallback - try to extract any course-like pattern
+            match = re.search(r'([A-Z]{3,5}\s*\d{3,4})', course_name)
+            if match:
+                course_code = match.group(1).replace(' ', '-')
+
+    # If we couldn't extract a course code, use a cleaned version of the course name
+    if not course_code:
+        # Remove semester info and clean up
+        clean_name = re.sub(r'\b(Fall|Spring|Summer)\s*\d{4}\b', '', course_name, flags=re.IGNORECASE)
+        clean_name = re.sub(r'\b(FA|SP|SU)\s*\d{2,4}\b', '', clean_name, flags=re.IGNORECASE)
+        clean_name = re.sub(r'^\d{4}[A-Z]{2}-', '', clean_name)  # Remove semester prefix like "2025FS-"
+        clean_name = ' '.join(clean_name.split())
+        course_code = clean_name[:20] if clean_name else "Course"
+
+    # Create the title
+    title = f"Slides from today {course_code} {date_str}"
 
     # Trim to max length if needed
     if len(title) > max_length:
-        title = title[:max_length-3] + '...'
+        # Keep the important parts and truncate the course code if necessary
+        base = f"Slides from today "
+        suffix = f" {date_str}"
+        available_length = max_length - len(base) - len(suffix) - 3  # -3 for "..."
+        if available_length > 0:
+            truncated_code = course_code[:available_length] + "..."
+            title = f"{base}{truncated_code}{suffix}"
+        else:
+            title = title[:max_length-3] + "..."
 
-    return f"Slides from {title}"
+    return title

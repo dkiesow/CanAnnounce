@@ -275,7 +275,7 @@ def create_app():
         default_publish_datetime = future_date_cdt.strftime('%Y-%m-%dT%H:%M')
 
         # Calculate default title immediately (fast operation)
-        default_title = calculate_trimmed_title(course_name).replace('Slides from', 'Slides from today')
+        default_title = calculate_trimmed_title(course_name)
 
         # Build the body content
         default_body = "<p><a href='[FILE_URL_PLACEHOLDER]'>Today's slides are here</a></p>\n\n<p>ENTER BODY TEXT</p>\n\n"

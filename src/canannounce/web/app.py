@@ -95,7 +95,7 @@ def create_app():
             print("No upcoming assignments found, added message to body")
 
         # Calculate default title
-        default_title = calculate_trimmed_title(course_name).replace('Slides from', 'Slides from today')
+        default_title = calculate_trimmed_title(course_name)
 
         # Fetch quiz question if enabled
         quiz_question = None
