@@ -87,6 +87,14 @@
                 ],
                 // Override toolbar button styles for better contrast
                 setup: function (editor) {
+                    // Set the initial content when editor is ready
+                    editor.on('init', function () {
+                        // Get the content from the textarea (which includes quiz question)
+                        const textareaContent = document.getElementById('body').value;
+                        editor.setContent(textareaContent);
+                        console.log('TinyMCE content set:', textareaContent.substring(0, 100) + '...');
+                    });
+
                     editor.on('change', function () {
                         editor.save();
                     });
@@ -263,6 +271,34 @@
                 alert('An error occurred while submitting the form.');
             }
         });
+
+        document.addEventListener('DOMContentLoaded', function () {
+                let editorContent = `{{ default_body }}`;
+
+                // Append upcoming assignments if they exist
+                const assignmentsHtml = `{% if upcoming_assignments %}<p><b>Upcoming Assignments:</b></p><ul>{% for assignment in upcoming_assignments %}<li>{{ assignment.name }} (Due: {{ assignment.due_at }})</li>{% endfor %}</ul>{% endif %}`;
+                editorContent += assignmentsHtml;
+
+                // Append quiz question if it exists
+                const quizHtml = `{% if quiz_question %}<p><b>{{ quiz_question_prompt }}</b></p><p>{{ quiz_question }}</p>{% endif %}`;
+                editorContent += quizHtml;
+
+                if (typeof tinymce !== 'undefined') {
+                    tinymce.init({
+                        selector: '#body',
+                        height: 250,
+                        menubar: false,
+                        branding: false,
+                        plugins: ['lists', 'link', 'preview', 'code', 'table', 'paste'],
+                        toolbar: 'undo redo | formatselect | bold italic | alignleft aligncenter alignright | bullist numlist | link | code | preview',
+                        setup: function (editor) {
+                            editor.on('init', function () {
+                                editor.setContent(editorContent);
+                            });
+                        }
+                    });
+                }
+            });
     </script>
 </body>
 </html>
