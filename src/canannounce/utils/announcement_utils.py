@@ -136,30 +136,33 @@ def upload_file_to_course(course_id, title, body, file, publish_at=None, token=N
         return {'success': False, 'message': f'Error: {str(e)}'}
 
 
-def calculate_trimmed_title(course_name):
+def calculate_trimmed_title(course_name, max_length=50):
     """
-    Generate a trimmed course title with the format:
-    "<Trimmed Course Name> Slides from <Day of Week> <Date>"
+    Generate a trimmed title for announcements based on course name.
 
     Args:
-        course_name (str): Full course name
+        course_name (str): The full course name
+        max_length (int): Maximum length for the title
 
     Returns:
-        str: Formatted title string
+        str: Formatted announcement title
     """
-    # Get the current date
-    now = datetime.datetime.now()
-    day_of_week = now.strftime('%A')
-    month_day = now.strftime('%m/%d')  # MM/DD format
+    # Remove common course prefixes and suffixes
+    title = course_name
 
-    # Trim the course name if it's too long
-    trimmed_name = course_name
-    if len(course_name) > 30:
-        # Find a good breaking point
-        space_index = course_name.rfind(' ', 0, 30)
-        if space_index > 0:
-            trimmed_name = course_name[:space_index]
-        else:
-            trimmed_name = course_name[:27] + '...'
+    # Remove semester info (Fall 2025, Spring 2024, etc.)
+    import re
+    title = re.sub(r'\b(Fall|Spring|Summer)\s*\d{4}\b', '', title, flags=re.IGNORECASE)
+    title = re.sub(r'\b(FA|SP|SU)\s*\d{2,4}\b', '', title, flags=re.IGNORECASE)
 
-    return f"{trimmed_name} Slides from {day_of_week} {month_day}"
+    # Remove course codes at the beginning (like "CHEM 101 -")
+    title = re.sub(r'^[A-Z]{2,5}\s*\d{3,4}\s*[-:]?\s*', '', title)
+
+    # Clean up extra whitespace
+    title = ' '.join(title.split())
+
+    # Trim to max length if needed
+    if len(title) > max_length:
+        title = title[:max_length-3] + '...'
+
+    return f"Slides from {title}"

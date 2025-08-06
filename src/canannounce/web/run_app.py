@@ -36,9 +36,9 @@ QUIZ_QUESTION_PROMPT = getattr(config, 'QUIZ_QUESTION_PROMPT', 'Quiz Question')
 UPCOMING_ASSIGNMENT_DAYS = getattr(config, 'UPCOMING_ASSIGNMENT_DAYS', 7)
 
 # Now import utils from the new structure
-from canannounce.utils.announcement_utils import *
-from canannounce.utils.quiz_utils import *
-from canannounce.core.course_utils import *
+from canannounce.utils.announcement_utils import upload_file_to_course, calculate_trimmed_title
+from canannounce.core.course_utils import get_canvas_courses, get_course_details
+from canannounce.utils.quiz_utils import get_next_quiz_question
 
 # Define a function to filter courses based on the original filtering rules
 def filter_courses(courses):
@@ -191,9 +191,9 @@ def get_upcoming_assignments_fixed(token, base_url, course_id, days_ahead=60):
 
 # Create Flask app
 def create_app():
-    # Use the templates at the project root
-    template_dir = os.path.abspath(os.path.join(current_dir, '../../../templates'))
-    static_dir = os.path.abspath(os.path.join(current_dir, '../../../static'))
+    # Use the templates from the new structure
+    template_dir = os.path.abspath(os.path.join(current_dir, 'templates'))
+    static_dir = os.path.abspath(os.path.join(current_dir, 'static'))
 
     # Create Flask app with proper template and static paths
     app = Flask(__name__,
@@ -222,36 +222,10 @@ def create_app():
         course_id = request.args.get('course_id')
         course_name = request.args.get('course_name', 'Unnamed Course')
 
-        # Pass UPCOMING_ASSIGNMENT_DAYS from config to get_upcoming_assignments
-        upcoming_assignments = get_upcoming_assignments_fixed(
-            canvas_token,
-            canvas_base_url,
-            course_id,
-            days_ahead=UPCOMING_ASSIGNMENT_DAYS
-        )
-
-        # Add debug output for assignments
-        print(f"DEBUG: UPCOMING_ASSIGNMENT_DAYS = {UPCOMING_ASSIGNMENT_DAYS}")
-        print(f"DEBUG: Retrieved {len(upcoming_assignments) if upcoming_assignments else 0} upcoming assignments")
-        if not upcoming_assignments:
-            # Let's examine the raw assignments from Canvas
-            print("DEBUG: Attempting direct API call to retrieve assignments")
-            headers = {'Authorization': f'Bearer {canvas_token}'}
-            url = f"{canvas_base_url}/api/v1/courses/{course_id}/assignments"
-            params = {'per_page': 100}
-
-            try:
-                response = requests.get(url, headers=headers, params=params)
-                if response.status_code == 200:
-                    all_assignments = response.json()
-                    print(f"DEBUG: Canvas API returned {len(all_assignments)} total assignments")
-                    # Print the first few assignments for debugging
-                    for i, assignment in enumerate(all_assignments[:3]):
-                        print(f"DEBUG: Assignment {i+1}: Name={assignment.get('name')}, due_at={assignment.get('due_at')}")
-                else:
-                    print(f"DEBUG: Error retrieving assignments, status={response.status_code}")
-            except Exception as e:
-                print(f"DEBUG: Exception during API request: {str(e)}")
+        # Check if data was preloaded
+        preloaded = request.args.get('preloaded') == 'true'
+        assignments_html = request.args.get('assignments_html', '')
+        quiz_html = request.args.get('quiz_html', '')
 
         # Fetch course details if course_name is missing
         if course_name == 'Unnamed Course' and course_id:
@@ -266,49 +240,21 @@ def create_app():
         # Format for datetime-local input
         default_publish_datetime = future_date_cdt.strftime('%Y-%m-%dT%H:%M')
 
-        # Prepare default body text
-        default_body = "<p><a href='[FILE_URL_PLACEHOLDER]'>Today's slides are here</a></p>\n\n<p>ENTER BODY TEXT</p>\n\n"
-
-        # Debug output for assignments
-        print(f"Upcoming assignments count: {len(upcoming_assignments) if upcoming_assignments else 0}")
-        if upcoming_assignments:
-            assignments_html = []
-            for assignment in upcoming_assignments:
-                # Get the formatted due date
-                due_date = assignment['due_at_formatted'] if 'due_at_formatted' in assignment else assignment['due_at']
-
-                # Create hyperlink if html_url is available, otherwise just use the name
-                if 'html_url' in assignment and assignment['html_url']:
-                    assignment_link = f'<a href="{assignment["html_url"]}" target="_blank">{assignment["name"]}</a>'
-                else:
-                    assignment_link = assignment['name']
-
-                # Add the list item with hyperlinked assignment name
-                assignments_html.append(f"<li>{assignment_link} (Due: {due_date})</li>")
-
-            # Join all list items and add to the default body
-            default_body += f"<p><b>Upcoming Assignments:</b></p>\n<ul>\n{''.join(assignments_html)}\n</ul>"
-            print(f"Added hyperlinked assignments HTML")
-        else:
-            # Add message when no assignments are found
-            default_body += f"<p><b>No Assignments are due in the next {UPCOMING_ASSIGNMENT_DAYS} Days</b></p>\n\n"
-            print("No upcoming assignments found, added message to body")
-
-        # Calculate default title
+        # Calculate default title immediately (fast operation)
         default_title = calculate_trimmed_title(course_name).replace('Slides from', 'Slides from today')
 
-        # Fetch quiz question if enabled
-        quiz_question = None
-        if INCLUDE_QUIZ_QUESTION:
-            quiz_question = get_next_quiz_question(course_id)
-            if quiz_question:
-                default_body += f"\n\n<p><b>{QUIZ_QUESTION_PROMPT}:</b> {quiz_question}</p>"
-                print(f"Added quiz question: {quiz_question[:100]}...")
+        # Build the body content
+        default_body = "<p><a href='[FILE_URL_PLACEHOLDER]'>Today's slides are here</a></p>\n\n<p>ENTER BODY TEXT</p>\n\n"
 
-        # Debug output of full default_body
-        print(f"Full default_body content: {default_body}")
+        if preloaded and (assignments_html or quiz_html):
+            # Use preloaded data
+            default_body += assignments_html + quiz_html
+            print(f"Using preloaded data for course {course_id}")
+        else:
+            # No preloaded data - we'll load it via AJAX (fallback)
+            print(f"No preloaded data for course {course_id}, will load via AJAX")
 
-        # Render the modal template instead of select_course.html
+        # Render the modal template with the content
         return render_template('modal.html',
                             course_id=course_id,
                             course_name=course_name,
@@ -317,9 +263,71 @@ def create_app():
                             default_publish_datetime=default_publish_datetime,
                             now=ANNOUNCEMENT_NOW,
                             tinymce_api_key=TINYMCE_API_KEY,
-                            upcoming_assignments=upcoming_assignments,
-                            quiz_question=quiz_question,
-                            quiz_question_prompt=QUIZ_QUESTION_PROMPT)
+                            upcoming_assignments=[],  # Not needed anymore since we have HTML
+                            quiz_question=None,  # Not needed anymore since we have HTML
+                            quiz_question_prompt=QUIZ_QUESTION_PROMPT,
+                            upcoming_assignment_days=UPCOMING_ASSIGNMENT_DAYS,
+                            preloaded=preloaded)  # Pass this to template for conditional loading
+
+    # Add new API endpoint for loading assignments and quiz data asynchronously
+    @app.route('/api/course_data/<course_id>')
+    def get_course_data(course_id):
+        """Get assignments and quiz questions for a course asynchronously."""
+        try:
+            # Fetch upcoming assignments
+            upcoming_assignments = get_upcoming_assignments_fixed(
+                canvas_token,
+                canvas_base_url,
+                course_id,
+                days_ahead=UPCOMING_ASSIGNMENT_DAYS
+            )
+
+            # Fetch quiz question if enabled
+            quiz_question = None
+            if INCLUDE_QUIZ_QUESTION:
+                quiz_question = get_next_quiz_question(course_id)
+
+            # Build assignments HTML
+            assignments_html = ""
+            if upcoming_assignments:
+                assignments_list = []
+                for assignment in upcoming_assignments:
+                    # Get the formatted due date
+                    due_date = assignment['due_at_formatted'] if 'due_at_formatted' in assignment else assignment['due_at']
+
+                    # Create hyperlink if html_url is available, otherwise just use the name
+                    if 'html_url' in assignment and assignment['html_url']:
+                        assignment_link = f'<a href="{assignment["html_url"]}" target="_blank">{assignment["name"]}</a>'
+                    else:
+                        assignment_link = assignment['name']
+
+                    # Add the list item with hyperlinked assignment name
+                    assignments_list.append(f"<li>{assignment_link} (Due: {due_date})</li>")
+
+                assignments_html = f"<p><b>Upcoming Assignments:</b></p>\n<ul>\n{''.join(assignments_list)}\n</ul>"
+            else:
+                assignments_html = f"<p><b>No Assignments are due in the next {UPCOMING_ASSIGNMENT_DAYS} Days</b></p>\n\n"
+
+            # Build quiz question HTML
+            quiz_html = ""
+            if quiz_question:
+                quiz_html = f"\n\n<p><b>{QUIZ_QUESTION_PROMPT}:</b> {quiz_question}</p>"
+
+            return jsonify({
+                'success': True,
+                'assignments_html': assignments_html,
+                'quiz_html': quiz_html,
+                'assignments_count': len(upcoming_assignments) if upcoming_assignments else 0
+            })
+
+        except Exception as e:
+            print(f"Error fetching course data: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e),
+                'assignments_html': f"<p><b>No Assignments are due in the next {UPCOMING_ASSIGNMENT_DAYS} Days</b></p>\n\n",
+                'quiz_html': ""
+            })
 
     @app.route('/submit', methods=['POST'])
     def submit():

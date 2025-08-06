@@ -81,72 +81,45 @@ def get_quiz_questions(course_id, quiz_id, token, base_url):
         return []
 
 
-def get_next_quiz_question(course_id=None):
+def get_next_quiz_question(course_id):
     """
-    Fetch a random question from the next quiz in a course.
+    Get a random question from upcoming quizzes in the course.
 
     Args:
-        course_id (str, optional): Canvas course ID. If not provided, tries to get from request context
+        course_id (str): Canvas course ID
 
     Returns:
-        str: Full text of a randomly selected quiz question or None if no questions found
+        str: A random quiz question, or None if no questions found
     """
-    if not course_id:
-        # Try to get course_id from Flask request context
-        try:
-            from flask import request
-            course_id = request.form.get('course_id') or request.args.get('course_id')
-        except:
-            # If no Flask context, return None
-            course_id = None
-
-    if not course_id:
-        print("No course ID provided")
-        return None
-
     try:
-        # Get upcoming quizzes
         quizzes = get_canvas_quizzes(course_id, canvas_token, canvas_base_url)
-
-        # If no quizzes exist, return None immediately
         if not quizzes:
-            print(f"No upcoming quizzes found for course {course_id}")
             return None
 
-        # Get the next quiz (earliest due date)
-        next_quiz = quizzes[0]
-        print(f"Found next quiz: {next_quiz.get('title', 'Unnamed Quiz')} (ID: {next_quiz.get('id')})")
+        # Get questions from all upcoming quizzes
+        all_questions = []
+        for quiz in quizzes:
+            questions = get_quiz_questions(course_id, quiz['id'], canvas_token, canvas_base_url)
+            if questions:
+                # Filter for questions with text content
+                text_questions = [q for q in questions if q.get('question_text')]
+                all_questions.extend(text_questions)
 
-        # Get questions for the next quiz
-        questions = get_quiz_questions(course_id, next_quiz['id'], canvas_token, canvas_base_url)
+        if all_questions:
+            # Select a random question
+            selected_question = random.choice(all_questions)
+            question_text = selected_question.get('question_text', '')
 
-        if not questions:
-            print(f"No questions found for quiz {next_quiz.get('id')}")
-            return None
+            # Clean up HTML tags if present
+            import re
+            question_text = re.sub(r'<[^>]+>', '', question_text)
+            question_text = question_text.strip()
 
-        # Filter for questions with text
-        text_questions = [q for q in questions if q.get('question_text')]
+            # Return the question if it has meaningful content
+            if question_text and len(question_text) > 10:
+                return question_text
 
-        if not text_questions:
-            print(f"No valid question text found in quiz {next_quiz.get('id')}")
-            return None
-
-        # Simply select a random question
-        selected_question = random.choice(text_questions)
-        question_text = selected_question.get('question_text', '')
-
-        # Clean up HTML tags if present
-        import re
-        question_text = re.sub(r'<[^>]+>', '', question_text)
-        question_text = question_text.strip()
-
-        # Validate the question has some content
-        if question_text and len(question_text) > 10:
-            print(f"Selected random quiz question: {question_text[:50]}...")
-            return question_text
-        else:
-            print(f"Selected question was too short or empty")
-            return None
+        return None
 
     except Exception as e:
         print(f"Error getting quiz question: {e}")
