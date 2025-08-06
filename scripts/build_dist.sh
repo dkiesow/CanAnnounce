@@ -6,6 +6,14 @@ set -e
 echo "📦 Building CanAnnounce Distribution Package"
 echo "==========================================="
 
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+# Get the project root directory (parent of scripts directory)
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Change to project root directory
+cd "$PROJECT_ROOT"
+
 # Clean previous builds
 echo "🧹 Cleaning previous builds..."
 rm -rf build/ dist/ *.egg-info/

@@ -22,15 +22,15 @@ This was developed and tested ONLY on a Mac. It may work on other platforms, but
 ```bash
 git clone https://github.com/yourusername/canannounce.git
 cd canannounce
-chmod +x install.sh
-./install.sh
+chmod +x scripts/install.sh
+./scripts/install.sh
 ```
 
 **Windows:**
 ```cmd
 git clone https://github.com/yourusername/canannounce.git
 cd canannounce
-install.bat
+scripts\install.bat
 ```
 
 ### Method 2: Manual Installation
@@ -147,8 +147,8 @@ pip install -e .[dev]
 pytest
 
 # Build distribution packages
-chmod +x build_dist.sh
-./build_dist.sh
+chmod +x scripts/build_dist.sh
+./scripts/build_dist.sh
 ```
 
 ### Project Structure

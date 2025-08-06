@@ -4,6 +4,9 @@ REM Quick install script for CanAnnounce (Windows)
 echo 🎯 CanAnnounce Quick Install
 echo ============================
 
+REM Get the directory where this script is located and change to project root
+cd /d "%~dp0.."
+
 REM Check Python version
 python --version >nul 2>&1
 if errorlevel 1 (
